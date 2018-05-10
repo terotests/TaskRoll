@@ -218,7 +218,7 @@ class AsyncProcess {
                     return;
                 }
                 if (value instanceof AsyncProcess) {
-                    return value;
+                    return value.clone();
                 }
                 c.resolve(value);
             }
@@ -353,6 +353,9 @@ class AsyncProcess {
                 fn = name.clone();
             if (params instanceof AsyncProcess)
                 params = givenParams.clone();
+            if (typeof name == 'function') {
+                return AsyncProcess.of(params).value(_ => name(_));
+            }
             if (typeof params === 'function') {
                 return AsyncProcess.of().code(_ => {
                     return params(ctx.value);
@@ -368,7 +371,6 @@ class AsyncProcess {
     resolve(ctx) {
         // can not resolve many times
         if (ctx.task.state == AsyncProcessState.Resolved || ctx.task.state == AsyncProcessState.Rejected) {
-            // console.log("Duplicate resolve attempt")
             return;
         }
         if (this.state != AsyncProcessState.Running) {
@@ -451,8 +453,10 @@ class AsyncProcess {
         this.run(ctx);
     }
     step(ctx) {
-        if (this.state !== AsyncProcessState.Running)
+        if (this.state !== AsyncProcessState.Running) {
+            console.log('can not step');
             return;
+        }
         if ((this.index + 1) >= this.children.length) {
             if (this.type == AsyncProcessType.Background) {
                 this.state = AsyncProcessState.Begin;
@@ -468,7 +472,12 @@ class AsyncProcess {
         }
         const nextTask = this.children[this.index + 1];
         if (!nextTask || nextTask.state !== AsyncProcessState.Begin) {
-            // start only tasks which are at the beginning of their lifecycle
+            // if the task was resolved return the resolved value
+            if (nextTask.state == AsyncProcessState.Resolved) {
+                process.nextTick(_ => {
+                    ctx.resolve(nextTask.result.value);
+                });
+            }
             return;
         }
         this.index = this.index + 1;
