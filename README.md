@@ -13,6 +13,6 @@ Simple usage
     .rollback( async ctx => {
       // ctx.value has the process resolved value
     })
-  // then at some point
+  // evaluate when needed
   process.start()
 ```
