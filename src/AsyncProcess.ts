@@ -514,7 +514,6 @@ export class AsyncProcess {
   step( ctx:AsyncProcessCtx ) {
 
     if(this.state !== AsyncProcessState.Running) {
-      console.log('can not step')
       return
     }
     if( ( this.index + 1 ) >= this.children.length) {
