@@ -39,17 +39,17 @@ function user_test() {
         .log(_ => `${_}`);
 }
 function simple_test() {
-    return AsyncProcess_1.AsyncProcess.of([1, 2, 3])
-        .log('starting simple_test')
-        .sleep(2000)
-        .map(_ => _ * 2)
-        .forEach(_ => {
-        console.log(_);
-    })
-        .code(_ => {
-        return 20000;
-    })
-        .log(_ => _);
+    const mapper = AsyncProcess_1.AsyncProcess.of().value(_ => _ * 15);
+    const show_slowly = AsyncProcess_1.AsyncProcess.of()
+        .log(_ => _)
+        .sleep(1000);
+    const process = AsyncProcess_1.AsyncProcess.of([1, 2, 3])
+        .map(mapper)
+        .forEach(show_slowly)
+        .rollback(async (ctx) => {
+        // ctx.value has the process resolved value
+    });
+    return process;
 }
 AsyncProcess_1.AsyncProcess.of()
     .add(user_test())

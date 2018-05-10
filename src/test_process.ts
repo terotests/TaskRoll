@@ -21,7 +21,6 @@ const findUser = AsyncProcess.of()
     console.log('could rollback the user op for ', ctx.value)
   })
 
-
 function user_test() : AsyncProcess {
   return AsyncProcess.of([1,2,3])
     .map(findUser) // fetch users from DB using function or process
@@ -44,17 +43,17 @@ function user_test() : AsyncProcess {
 }
 
 function simple_test() : AsyncProcess {
-  return AsyncProcess.of([1,2,3])
-    .log('starting simple_test')
-    .sleep(2000)
-    .map( _ => _ * 2)
-    .forEach( _ => {
-      console.log(_)
+  const mapper = AsyncProcess.of().value( _ => _ * 15)
+  const show_slowly = AsyncProcess.of()
+    .log( _ => _ )
+    .sleep(1000)
+  const process = AsyncProcess.of([1,2,3])
+    .map(mapper)
+    .forEach(show_slowly)
+    .rollback( async ctx => {
+      // ctx.value has the process resolved value
     })
-    .code( _ => {
-      return 20000
-    })
-    .log( _ => _)
+  return process
 }
 
 AsyncProcess.of()
