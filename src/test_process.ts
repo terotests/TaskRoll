@@ -7,14 +7,20 @@ function sleep (ms:number) : Promise<any> {
   })
 }
 
-async function findUser(id) {
-  console.log(`Fetching user ${id} from database :)`)
-  await sleep(1000)
-  return {
-    id : id,
-    name : `user ${id}`
-  }
-}
+const findUser = AsyncProcess.of()
+  .code( async ctx => {
+    const id = ctx.value
+    console.log(`Fetching user ${id} from database :)`)
+    await sleep(1000)
+    return {
+      id : id,
+      name : `user ${id}`
+    }  
+  })
+  .rollback( async ctx => {
+    console.log('could rollback the user op for ', ctx.value)
+  })
+
 
 function user_test() : AsyncProcess {
   return AsyncProcess.of([1,2,3])

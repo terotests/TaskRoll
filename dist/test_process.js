@@ -7,14 +7,19 @@ function sleep(ms) {
         setTimeout(r, ms);
     });
 }
-async function findUser(id) {
+const findUser = AsyncProcess_1.AsyncProcess.of()
+    .code(async (ctx) => {
+    const id = ctx.value;
     console.log(`Fetching user ${id} from database :)`);
     await sleep(1000);
     return {
         id: id,
         name: `user ${id}`
     };
-}
+})
+    .rollback(async (ctx) => {
+    console.log('could rollback the user op for ', ctx.value);
+});
 function user_test() {
     return AsyncProcess_1.AsyncProcess.of([1, 2, 3])
         .map(findUser) // fetch users from DB using function or process
