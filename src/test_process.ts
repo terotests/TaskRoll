@@ -1,5 +1,6 @@
 import { AsyncProcess, AsyncProcessCtx } from './AsyncProcess'
 
+// promisified sleep for testing...
 function sleep (ms:number) : Promise<any> {
   return new Promise( (r) => {
     setTimeout(r, ms)
@@ -17,7 +18,10 @@ async function findUser(id) {
 
 function user_test() : AsyncProcess {
   return AsyncProcess.of([1,2,3])
-    .map(findUser) // whatever, database etc.
+    .map(findUser) // fetch users from DB using function or process
+    .value( _ => {
+      // Do whatever you want with the values...
+    })
     .forEach( _ => console.log(`${JSON.stringify(_)}`))
     .value([1,2,3,4])
     // map using simple function
@@ -33,4 +37,22 @@ function user_test() : AsyncProcess {
     .log( _ => `${_}`)
 }
 
-user_test().start()
+function simple_test() : AsyncProcess {
+  return AsyncProcess.of([1,2,3])
+    .log('starting simple_test')
+    .sleep(2000)
+    .map( _ => _ * 2)
+    .forEach( _ => {
+      console.log(_)
+    })
+    .code( _ => {
+      return 20000
+    })
+    .log( _ => _)
+}
+
+AsyncProcess.of()
+  .add( user_test() )
+  .add( simple_test() )
+  .start()
+

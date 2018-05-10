@@ -561,24 +561,24 @@ export class AsyncProcess {
             this.endWithError(ctx)
           }
         })        
-    break;
-    case AsyncProcessType.Parallel:
-        // start taxk and move forward
-        const idx = this.index;
-        process.nextTick( _ => {
-          try {
-            resolve_task( nextTask )
-            const peekTask = this.children[idx + 1]
-            if(peekTask && peekTask.type == AsyncProcessType.Parallel) {
-              this.step(ctx)
+         break;
+      case AsyncProcessType.Parallel:
+          // start taxk and move forward
+          const idx = this.index;
+          process.nextTick( _ => {
+            try {
+              resolve_task( nextTask )
+              const peekTask = this.children[idx + 1]
+              if(peekTask && peekTask.type == AsyncProcessType.Parallel) {
+                this.step(ctx)
+              }
+              if(!peekTask) this.step(ctx)
+            } catch(e) {
+              console.error(e)
+              this.endWithError(ctx)
             }
-            if(!peekTask) this.step(ctx)
-          } catch(e) {
-            console.error(e)
-            this.endWithError(ctx)
-          }
-        })
-      break;
+          })
+        break;
     }    
   }
 
