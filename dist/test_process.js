@@ -61,13 +61,24 @@ function call_comp() {
         .log(_ => `call_comp : ${_}`);
 }
 function call_comp2() {
-    const mapper = AsyncProcess_1.AsyncProcess.of().value(_ => _ * 5);
+    const mulBy10 = AsyncProcess_1.AsyncProcess.of().value(_ => _ * 10);
+    const mapper = AsyncProcess_1.AsyncProcess.of().value(_ => mulBy10);
     const value = AsyncProcess_1.AsyncProcess.of(50);
     return AsyncProcess_1.AsyncProcess.of(value).call(mapper)
-        .log(_ => `call_comp2 : ${_}`);
+        .log(_ => `call_comp2 50 x 10 : ${_}`);
+}
+function call_comp2_variant() {
+    const mulBy5 = AsyncProcess_1.AsyncProcess.of().value(_ => _ * 5).log('5 x is slow :)').sleep(1000);
+    const mulBy10 = AsyncProcess_1.AsyncProcess.of().value(_ => _ * 10);
+    return AsyncProcess_1.AsyncProcess.of(50)
+        .value(mulBy10)
+        .value(mulBy5)
+        .value(mulBy5)
+        .log(_ => `${_} == 50 x 10 x 5 x 5`);
 }
 function test_calling() {
     const mapper = AsyncProcess_1.AsyncProcess.of(12345);
+    // test re-using composed lazy value reading as parameter
     const value = AsyncProcess_1.AsyncProcess.of(AsyncProcess_1.AsyncProcess.of(AsyncProcess_1.AsyncProcess.of(50)
         .sleep(200)
         .log('reading the value ...')
@@ -98,6 +109,7 @@ AsyncProcess_1.AsyncProcess.of()
     .add(simple_test())
     .add(call_comp())
     .add(call_comp2())
+    .add(call_comp2_variant())
     .add(test_calling())
     .start();
 //# sourceMappingURL=test_process.js.map

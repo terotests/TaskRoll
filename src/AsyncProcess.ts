@@ -412,11 +412,9 @@ export class AsyncProcess {
       if( typeof name == 'string') fn = ctx.getState(name)
       if( name instanceof AsyncProcess) fn = name.clone();
       if( params instanceof AsyncProcess) params = givenParams.clone();      
-
       if( typeof name == 'function') {
         return AsyncProcess.of(params).value( _ => name(_))
-      }      
-      
+      }            
       if(typeof params === 'function') {
         return AsyncProcess.of().code( _ => {
           return params( ctx.value )

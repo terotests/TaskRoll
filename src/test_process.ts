@@ -67,10 +67,21 @@ function call_comp() : AsyncProcess {
 }
 
 function call_comp2() : AsyncProcess {
-  const mapper = AsyncProcess.of().value( _ => _ * 5)
+  const mulBy10 = AsyncProcess.of().value( _ => _ * 10)
+  const mapper = AsyncProcess.of().value( _ => mulBy10)
   const value = AsyncProcess.of(50)
   return AsyncProcess.of( value ).call( mapper )
-  .log( _ => `call_comp2 : ${_}` )
+  .log( _ => `call_comp2 50 x 10 : ${_}` )
+}
+
+function call_comp2_variant() : AsyncProcess {
+  const mulBy5 = AsyncProcess.of().value( _ => _ * 5).log('5 x is slow :)').sleep(1000)
+  const mulBy10 = AsyncProcess.of().value( _ => _ * 10)
+  return AsyncProcess.of(50)
+          .value(mulBy10)
+          .value(mulBy5)
+          .value(mulBy5)
+    .log( _ => `${_} == 50 x 10 x 5 x 5` )  
 }
 
 function test_calling() : AsyncProcess {
@@ -111,6 +122,7 @@ AsyncProcess.of()
   .add( simple_test() )
   .add( call_comp() )
   .add( call_comp2() )
+  .add( call_comp2_variant() )
   .add( test_calling() )
   .start()
 
