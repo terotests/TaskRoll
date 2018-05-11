@@ -11,22 +11,19 @@ Creates lazily evaluated tasks, which calcualate asyncronouse tasks in syncronou
 - Stack safe. 
 - Catches exceptions. 
 - Holds immutable context, which can be inspected and serialized. 
-- Supports functions returning promises as args (`async functions`)
-- Rollback is done in reverse order and syncronously allowing arbitary side-effect cancelling
-- Has state which can store temporary data and functions, which can be used as event handlers
+- Supports functions returning Promises
+- Rollback is done in reverse order and syncronously
+- Has state which can store temporary data and callable Tasks
 
 ```javascript
   const mapper = TaskRoll.of().value( _ => _ * 15)
   const show_slowly = TaskRoll.of()
     .log( _ => _ )
     .sleep(1000)
-  const task = TaskRoll.of([1,2,3])
+  const task = TaskRoll.of()
     .map(mapper)
     .forEach(show_slowly)
-    .rollback( async ctx => {
-      // ctx.value has the process resolved value
-    })
-  // evaluate when needed
+
   task.start()
 ```
 
