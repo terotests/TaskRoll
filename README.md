@@ -24,7 +24,12 @@ Creates lazily evaluated tasks, which calcualate asyncronouse tasks in syncronou
     .map(mapper)
     .forEach(show_slowly)
 
-  task.start()
+  TaskRoll.of([1,2,3,4]).chain(task).start()
+  // 15
+  // 30
+  // 45
+  // 60
+
 ```
 
 ## .of(value:any)
