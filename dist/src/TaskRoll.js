@@ -211,6 +211,9 @@ class TaskRoll {
         }));
         return this;
     }
+    chain(value) {
+        return this.value(value);
+    }
     value(value) {
         if (typeof value === 'function') {
             const p = new TaskRoll();

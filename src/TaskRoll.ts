@@ -8,20 +8,20 @@ export enum TaskRollType {
   Background,
 }
 
-type cleanupFnWithCtx = (ctx?:TaskRollCtx) => Promise<void>
-type cleanupFnWithoutCtx = () => Promise<void>
-type cleanupFn = cleanupFnWithCtx 
-type AnyFunction = (item:any) => any
-type readyFnHandler = (ctx?:TaskRollCtx) => any
+export type cleanupFnWithCtx = (ctx?:TaskRollCtx) => Promise<void>
+export type cleanupFnWithoutCtx = () => Promise<void>
+export type cleanupFn = cleanupFnWithCtx 
+export type AnyFunction = (item:any) => any
+export type readyFnHandler = (ctx?:TaskRollCtx) => any
 
-interface ProcessCallbacks {
+export interface ProcessCallbacks {
   onCleanup? : cleanupFn
   onCancel? : cleanupFn
   executeTask? : (ctx:TaskRollCtx) => any
   name? : string
 }
 
-type TaskRollFn = () => TaskRoll
+export type TaskRollFn = () => TaskRoll
 
 export enum TaskRollState {
   Begin = 1,
@@ -257,6 +257,10 @@ export class TaskRoll {
     }))
     return this
   }  
+
+  chain( value : any | AnyFunction | TaskRoll ) : TaskRoll {
+    return this.value( value )
+  }
 
   value( value : any | AnyFunction | TaskRoll ) : TaskRoll {
     if(typeof value === 'function') {
