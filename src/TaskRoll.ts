@@ -137,7 +137,7 @@ export class TaskRollCtx {
 }
 
 
-export class TaskRoll {
+export default class TaskRoll {
 
   index:number = -1;
   type:TaskRollType = TaskRollType.Sequential

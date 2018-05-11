@@ -1,4 +1,4 @@
-import { TaskRoll, TaskRollCtx } from './TaskRoll'
+import TaskRoll from './TaskRoll'
 
 // promisified sleep for testing...
 function sleep (ms:number) : Promise<any> {

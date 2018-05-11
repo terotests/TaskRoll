@@ -728,5 +728,5 @@ class TaskRoll {
         this._start(this.ctx);
     }
 }
-exports.TaskRoll = TaskRoll;
+exports.default = TaskRoll;
 //# sourceMappingURL=TaskRoll.js.map
