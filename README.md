@@ -203,5 +203,5 @@ Called when task ends
 
 Projects which are solving similar problems
 
-https://github.com/fluture-js/Fluture
-https://github.com/gcanti/io-ts
+- https://github.com/fluture-js/Fluture
+- https://github.com/gcanti/io-ts
