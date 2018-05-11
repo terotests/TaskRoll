@@ -1,5 +1,5 @@
 
-export enum AsyncProcessType {
+export enum TaskRollType {
   Sequential = 1,
   Parallel,
   Race,
@@ -8,22 +8,22 @@ export enum AsyncProcessType {
   Background,
 }
 
-type cleanupFnWithCtx = (ctx?:AsyncProcessCtx) => Promise<void>
+type cleanupFnWithCtx = (ctx?:TaskRollCtx) => Promise<void>
 type cleanupFnWithoutCtx = () => Promise<void>
 type cleanupFn = cleanupFnWithCtx 
 type AnyFunction = (item:any) => any
-type readyFnHandler = (ctx?:AsyncProcessCtx) => any
+type readyFnHandler = (ctx?:TaskRollCtx) => any
 
 interface ProcessCallbacks {
   onCleanup? : cleanupFn
   onCancel? : cleanupFn
-  executeTask? : (ctx:AsyncProcessCtx) => any
+  executeTask? : (ctx:TaskRollCtx) => any
   name? : string
 }
 
-type AsyncProcessFn = () => AsyncProcess
+type TaskRollFn = () => TaskRoll
 
-export enum AsyncProcessState {
+export enum TaskRollState {
   Begin = 1,
   Pending,
   Running,
@@ -38,18 +38,18 @@ function sleep (ms:number) : Promise<any> {
   })
 }
 
-export class AsyncProcessCtx {
+export class TaskRollCtx {
   value:any;
-  parent:AsyncProcess;
-  task:AsyncProcess;
-  thread:AsyncProcess;
+  parent:TaskRoll;
+  task:TaskRoll;
+  thread:TaskRoll;
   params:any;
   state:Object
 
   serialize () : Object {
     const s = {}
     Object.keys(this.state).forEach( key => {
-      if(! ( this.state[key] instanceof AsyncProcess) ) {
+      if(! ( this.state[key] instanceof TaskRoll) ) {
         s[key] = this.state[key] 
       }
     })
@@ -58,15 +58,15 @@ export class AsyncProcessCtx {
       state : s,
     }
   }
-  constructor(value?:any, parent?:AsyncProcess, params?:any, task?:AsyncProcess) {
+  constructor(value?:any, parent?:TaskRoll, params?:any, task?:TaskRoll) {
     this.value = value
     this.parent = parent;
     this.params = params;
     this.task = task;
     this.state = {}
   }
-  _copy() : AsyncProcessCtx {
-    const n = new AsyncProcessCtx()
+  _copy() : TaskRollCtx {
+    const n = new TaskRollCtx()
     n.value = this.value
     n.parent = this.parent
     n.task = this.task
@@ -79,7 +79,7 @@ export class AsyncProcessCtx {
     return this.state[name]
   }   
 
-  reduceState( value:any ) : AsyncProcessCtx {
+  reduceState( value:any ) : TaskRollCtx {
     const o = this._copy()
     o.state = {
       ...this.state,
@@ -87,7 +87,7 @@ export class AsyncProcessCtx {
     }
     return o
   }   
-  setState( name:string, value:any ) : AsyncProcessCtx {
+  setState( name:string, value:any ) : TaskRollCtx {
     const o = this._copy()
     o.state = {
       ...this.state,
@@ -95,33 +95,33 @@ export class AsyncProcessCtx {
     }
     return o
   }   
-  setThread( thread:AsyncProcess ) : AsyncProcessCtx {
+  setThread( thread:TaskRoll ) : TaskRollCtx {
     const o = this._copy()
     o.thread = thread
     return o
   }  
-  setTask( task:AsyncProcess ) : AsyncProcessCtx {
+  setTask( task:TaskRoll ) : TaskRollCtx {
     const o = this._copy()
     o.task = task
     return o
   }
-  setValue( value:any ) : AsyncProcessCtx {
+  setValue( value:any ) : TaskRollCtx {
     const o = this._copy()
     o.value = value
     return o
   }
-  setParent( parent:AsyncProcess ) : AsyncProcessCtx {
+  setParent( parent:TaskRoll ) : TaskRollCtx {
     const o = this._copy()
     o.parent = parent
     return o
   }
-  setParams( params:any ) : AsyncProcessCtx {
+  setParams( params:any ) : TaskRollCtx {
     const o = this._copy()
     o.params = params
     return o
   }
   resolve( value? : any ) {
-    if( value instanceof AsyncProcessCtx ) {
+    if( value instanceof TaskRollCtx ) {
       this.parent.resolve( value )
       return
     }
@@ -137,21 +137,21 @@ export class AsyncProcessCtx {
 }
 
 
-export class AsyncProcess {
+export class TaskRoll {
 
   index:number = -1;
-  type:AsyncProcessType = AsyncProcessType.Sequential
-  state:AsyncProcessState = AsyncProcessState.Begin
+  type:TaskRollType = TaskRollType.Sequential
+  state:TaskRollState = TaskRollState.Begin
   
-  children:Array<AsyncProcess>;
-  spawned:Array<AsyncProcess>;
-  ctx:AsyncProcessCtx
-  result:AsyncProcessCtx
+  children:Array<TaskRoll>;
+  spawned:Array<TaskRoll>;
+  ctx:TaskRollCtx
+  result:TaskRollCtx
 
   onFulfilledHandlers:Array<readyFnHandler>
 
-  next:AsyncProcess
-  prev:AsyncProcess
+  next:TaskRoll
+  prev:TaskRoll
 
   closeAtEnd:boolean = false
   shutdown:boolean = false
@@ -167,8 +167,8 @@ export class AsyncProcess {
     this.children = []
     this.spawned = []
     this.onFulfilledHandlers = []
-    this.type = AsyncProcessType.Sequential
-    this.result = new AsyncProcessCtx()
+    this.type = TaskRollType.Sequential
+    this.result = new TaskRollCtx()
     if(cbs) {
       this.executeTask = cbs.executeTask || this.executeTask
       this.onCleanup = cbs.onCleanup || this.onCleanup
@@ -177,14 +177,14 @@ export class AsyncProcess {
     }
   }
 
-  static of(value?:any) : AsyncProcess {
-    const p = new AsyncProcess({name:'of'});
+  static of(value?:any) : TaskRoll {
+    const p = new TaskRoll({name:'of'});
     if(typeof value === 'undefined') return p
     return p.value( value ) 
   }
 
-  clone () : AsyncProcess {
-    const c = new AsyncProcess()
+  clone () : TaskRoll {
+    const c = new TaskRoll()
     c.type = this.type
     c.children = this.children.map( c => c.clone() )
     c.isolated = this.isolated
@@ -195,12 +195,12 @@ export class AsyncProcess {
     return c
   }
 
-  commit () : AsyncProcess {
+  commit () : TaskRoll {
     this.committed = true
     return this
   }
 
-  log( msg : string | AnyFunction) : AsyncProcess {
+  log( msg : string | AnyFunction) : TaskRoll {
     return this.code( _ => {
       if(typeof(msg) === 'function') {
         console.log( msg( _.value ) )
@@ -210,19 +210,19 @@ export class AsyncProcess {
     }, 'log')
   }
 
-  sleep( ms : number) : AsyncProcess {
+  sleep( ms : number) : TaskRoll {
     return this.code( async _ => {
       await sleep(ms)
     }, 'sleep')
   }
 
-  add( o : AsyncProcess ) : AsyncProcess {
+  add( o : TaskRoll ) : TaskRoll {
     this.children.push(o)
     return this;
   }   
 
-  fork( build: (p:AsyncProcess) => void ) : AsyncProcess {
-    const o = new AsyncProcess()
+  fork( build: (p:TaskRoll) => void ) : TaskRoll {
+    const o = new TaskRoll()
     o.isolated = true
     o.name = 'fork'
     build(o)
@@ -230,15 +230,15 @@ export class AsyncProcess {
     return this;
   }    
   
-  process( build: (p:AsyncProcess) => void ) : AsyncProcess {
-    const o = new AsyncProcess()
+  process( build: (p:TaskRoll) => void ) : TaskRoll {
+    const o = new TaskRoll()
     build(o)
     this.children.push(o)
     return this;
   }   
 
-  valueFrom( name:string ) : AsyncProcess {
-    this.children.push( new AsyncProcess({
+  valueFrom( name:string ) : TaskRoll {
+    this.children.push( new TaskRoll({
       name : `valueFrom ${name}`,
       executeTask(c) {
         c.resolve( c.getState(name) )
@@ -247,8 +247,8 @@ export class AsyncProcess {
     return this
   }   
 
-  valueTo( name:string ) : AsyncProcess {
-    this.children.push( new AsyncProcess({
+  valueTo( name:string ) : TaskRoll {
+    this.children.push( new TaskRoll({
       name : `valueTo ${name}`,
       executeTask(c) {
         const newCtx = c.setState(name, c.value )
@@ -258,21 +258,21 @@ export class AsyncProcess {
     return this
   }  
 
-  value( value : any | AnyFunction | AsyncProcess ) : AsyncProcess {
+  value( value : any | AnyFunction | TaskRoll ) : TaskRoll {
     if(typeof value === 'function') {
-      const p = new AsyncProcess()
+      const p = new TaskRoll()
       p.code( ctx => value(ctx.value) )
       this.children.push(p)
       return this
     }     
-    this.children.push( new AsyncProcess({
+    this.children.push( new TaskRoll({
       name : `value`,
       executeTask(c) {
         if(typeof(value) == 'function') {
           c.resolve(value(c.value))
           return
         } 
-        if( value instanceof AsyncProcess) {
+        if( value instanceof TaskRoll) {
           return value.clone()
         }
         c.resolve(value)
@@ -281,28 +281,28 @@ export class AsyncProcess {
     return this
   }   
 
-  background( build: (p:AsyncProcess) => void ) : AsyncProcess {
-    const o = new AsyncProcess()
-    o.type = AsyncProcessType.Background
+  background( build: (p:TaskRoll) => void ) : TaskRoll {
+    const o = new TaskRoll()
+    o.type = TaskRollType.Background
     build(o)
     this.children.push(o)
     return this;
   }   
 
-  parallel( build: (p:AsyncProcess) => void ) : AsyncProcess {
-    const o = new AsyncProcess()
-    o.type = AsyncProcessType.Parallel
+  parallel( build: (p:TaskRoll) => void ) : TaskRoll {
+    const o = new TaskRoll()
+    o.type = TaskRollType.Parallel
     build(o)
     this.children.push(o)
     return this;
   }   
   
-  forEach ( fn : AnyFunction | AsyncProcessFn | AsyncProcess, name?:string ) : AsyncProcess {
-    const o = new AsyncProcess();
+  forEach ( fn : AnyFunction | TaskRollFn | TaskRoll, name?:string ) : TaskRoll {
+    const o = new TaskRoll();
     o.isolated = true
     o.name = 'forEach' + (name ? ' ' + name : '')
-    o.executeTask = function( ctx:AsyncProcessCtx ) {
-      const mapProcess = new AsyncProcess()
+    o.executeTask = function( ctx:TaskRollCtx ) {
+      const mapProcess = new TaskRoll()
       mapProcess.isolated = true
       if(typeof fn === 'function') {
         return mapProcess.value(ctx.value).code( ctx => {
@@ -310,7 +310,7 @@ export class AsyncProcess {
           // return ctx.value.map(fn)
         })
       }      
-      return AsyncProcess.of(ctx.value)
+      return TaskRoll.of(ctx.value)
         .fork( p  => {
           for( let value of ctx.value) {
             p.call(fn, value)
@@ -321,29 +321,29 @@ export class AsyncProcess {
     return this
   }
 
-  cleanup( fn:cleanupFnWithCtx ) : AsyncProcess {
+  cleanup( fn:cleanupFnWithCtx ) : TaskRoll {
     this.onCleanup = fn
     return this
   }
   
-  rollback( fn:cleanupFnWithCtx ) : AsyncProcess {
+  rollback( fn:cleanupFnWithCtx ) : TaskRoll {
     this.onCancel = fn
     return this
   }
 
-  map ( fn : AnyFunction | AsyncProcessFn | AsyncProcess | any ) : AsyncProcess {
-    const o = new AsyncProcess();
+  map ( fn : AnyFunction | TaskRollFn | TaskRoll | any ) : TaskRoll {
+    const o = new TaskRoll();
     o.name = 'map'
-    o.executeTask = function( ctx:AsyncProcessCtx ) {      
+    o.executeTask = function( ctx:TaskRollCtx ) {      
       if(typeof fn === 'function') {
-        return AsyncProcess.of(ctx.value).code( ctx => {
+        return TaskRoll.of(ctx.value).code( ctx => {
           return Promise.all( ctx.value.map(fn) )
         })
       }
-      if(fn instanceof AsyncProcess) {
+      if(fn instanceof TaskRoll) {
         o.name = o.name + ' ' + ( fn.name || '')
       }
-      return AsyncProcess.of(ctx.value)
+      return TaskRoll.of(ctx.value)
         .process( p  => {
           const items = []
           for( let value of ctx.value) {
@@ -361,13 +361,13 @@ export class AsyncProcess {
     return this
   }
 
-  code( fn :(ctx:AsyncProcessCtx) => any, name? :string ) : AsyncProcess {
-    const o = new AsyncProcess();
+  code( fn :(ctx:TaskRollCtx) => any, name? :string ) : TaskRoll {
+    const o = new TaskRoll();
     o.setName(  name || 'code' )
-    o.executeTask = function( ctx:AsyncProcessCtx ) {
+    o.executeTask = function( ctx:TaskRollCtx ) {
       try {
         const new_value = fn( ctx )
-        if( new_value instanceof AsyncProcess) {
+        if( new_value instanceof TaskRoll) {
           return new_value
         }
         // resolve promise from code
@@ -389,7 +389,7 @@ export class AsyncProcess {
     return this;
   }  
   
-  fn( name:string, fnCode:AsyncProcess ) : AsyncProcess {
+  fn( name:string, fnCode:TaskRoll ) : TaskRoll {
     this.code( ctx => {
       // should be using the scope
       ctx.resolve( ctx.setState(name, fnCode) )
@@ -397,46 +397,46 @@ export class AsyncProcess {
     return this
   }
   
-  setName( name : string | any) : AsyncProcess{
+  setName( name : string | any) : TaskRoll{
     if(typeof(name) == 'string') this.name = name
-    if( name instanceof AsyncProcess) this.name = name.name
+    if( name instanceof TaskRoll) this.name = name.name
     return this
   }
 
   // TODO: handle call 
-  call( name:string | any, givenParams? : AnyFunction | any ) : AsyncProcess {
+  call( name:string | any, givenParams? : AnyFunction | any ) : TaskRoll {
     this.code( ctx => {
-      let fn:AsyncProcess;
+      let fn:TaskRoll;
       let params = givenParams
 
       if( typeof name == 'string') fn = ctx.getState(name)
-      if( name instanceof AsyncProcess) fn = name.clone();
-      if( params instanceof AsyncProcess) params = givenParams.clone();      
+      if( name instanceof TaskRoll) fn = name.clone();
+      if( params instanceof TaskRoll) params = givenParams.clone();      
       if( typeof name == 'function') {
-        return AsyncProcess.of(params).value( _ => name(_))
+        return TaskRoll.of(params).value( _ => name(_))
       }            
       if(typeof params === 'function') {
-        return AsyncProcess.of().code( _ => {
+        return TaskRoll.of().code( _ => {
           return params( ctx.value )
         }, name).setName(name).add( fn.clone() )
       }
       if(typeof params !== 'undefined') {
-        return AsyncProcess.of( params ).setName(name).add( fn.clone() )
+        return TaskRoll.of( params ).setName(name).add( fn.clone() )
       }
       return fn.clone().setName(name)
     }, `${name.name || name}()`)
     return this
   }
 
-  resolve(ctx:AsyncProcessCtx) {
+  resolve(ctx:TaskRollCtx) {
     // can not resolve many times
-    if(ctx.task.state == AsyncProcessState.Resolved || ctx.task.state == AsyncProcessState.Rejected) {
+    if(ctx.task.state == TaskRollState.Resolved || ctx.task.state == TaskRollState.Rejected) {
       return      
     }
-    if(this.state != AsyncProcessState.Running) {
+    if(this.state != TaskRollState.Running) {
       return;
     }
-    ctx.task.state = AsyncProcessState.Resolved
+    ctx.task.state = TaskRollState.Resolved
     // The result is for both the thread and the task where it was spawned from 
     ctx.thread.result = ctx
     ctx.task.result = ctx;
@@ -447,14 +447,14 @@ export class AsyncProcess {
       this.endWithError(ctx)
       return
     }
-    const parallels_exited = ( key:string, task?:AsyncProcess ) => {
+    const parallels_exited = ( key:string, task?:TaskRoll ) => {
       if(!task) return true
-      if(task.type != AsyncProcessType.Parallel) return true
-      if(task.type == AsyncProcessType.Parallel && task.state == AsyncProcessState.Running) return false
+      if(task.type != TaskRollType.Parallel) return true
+      if(task.type == TaskRollType.Parallel && task.state == TaskRollState.Running) return false
       return parallels_exited( key, task[key] )
     }
     if(ctx.task) {
-      if(ctx.task.type == AsyncProcessType.Parallel) {
+      if(ctx.task.type == TaskRollType.Parallel) {
         if( parallels_exited('prev', ctx.task) &&  parallels_exited('next', ctx.task)  ) {
           this.step(ctx) 
         }
@@ -467,17 +467,17 @@ export class AsyncProcess {
     } 
   }
 
-  reject(ctx:AsyncProcessCtx) {
-    if(ctx.task.state !== AsyncProcessState.Running) {
+  reject(ctx:TaskRollCtx) {
+    if(ctx.task.state !== TaskRollState.Running) {
       return
     }
     this.endWithError(ctx)
   }
 
-  _start(ctx:AsyncProcessCtx) {    
-    if(this.state !== AsyncProcessState.Begin) return
+  _start(ctx:TaskRollCtx) {    
+    if(this.state !== TaskRollState.Begin) return
     this.index = -1;
-    this.state = AsyncProcessState.Running
+    this.state = TaskRollState.Running
     this.children.forEach( (item, index) => {
       item.next = this.children[index + 1]
       item.prev = index > 0 ? this.children[index - 1] : null
@@ -485,54 +485,54 @@ export class AsyncProcess {
     this.step(this.ctx)
   }
 
-  run (ctx?:AsyncProcessCtx) {
-    this.ctx = ctx || new AsyncProcessCtx();
+  run (ctx?:TaskRollCtx) {
+    this.ctx = ctx || new TaskRollCtx();
     this._start(this.ctx)
   }
 
-  reset (ctx:AsyncProcessCtx) {
+  reset (ctx:TaskRollCtx) {
     this.index = -1
-    this.state = AsyncProcessState.Begin
+    this.state = TaskRollState.Begin
     this.shutdown = false
     this.spawned = []
     this.children.forEach( ch => {
-      ch.state = AsyncProcessState.Begin
+      ch.state = TaskRollState.Begin
       ch.reset(ctx)
     })
   }  
 
-  executeTask( ctx:AsyncProcessCtx ) : AsyncProcess | undefined | void {
-    if(this.state === AsyncProcessState.Resolved) {
+  executeTask( ctx:TaskRollCtx ) : TaskRoll | undefined | void {
+    if(this.state === TaskRollState.Resolved) {
       // TODO: how to use already resolved value like promises do
       return
     }
-    if(this.state === AsyncProcessState.Rejected) return
-    this.state = AsyncProcessState.Begin
+    if(this.state === TaskRollState.Rejected) return
+    this.state = TaskRollState.Begin
     this.run(ctx)
   }    
   
-  step( ctx:AsyncProcessCtx ) {
+  step( ctx:TaskRollCtx ) {
 
-    if(this.state !== AsyncProcessState.Running) {
+    if(this.state !== TaskRollState.Running) {
       return
     }
     if( ( this.index + 1 ) >= this.children.length) {
-      if( this.type == AsyncProcessType.Background ) {
-        this.state = AsyncProcessState.Begin
+      if( this.type == TaskRollType.Background ) {
+        this.state = TaskRollState.Begin
         this.reset( this.ctx )
         this.run( this.ctx )
         return;
       }      
-      // this.state = AsyncProcessState.Resolved
+      // this.state = TaskRollState.Resolved
       process.nextTick( _ => {
         this.endGracefully( ctx )
       })
       return
     }
     const nextTask = this.children[this.index + 1]
-    if(!nextTask || nextTask.state !== AsyncProcessState.Begin) {
+    if(!nextTask || nextTask.state !== TaskRollState.Begin) {
       // if the task was resolved return the resolved value
-      if(nextTask.state == AsyncProcessState.Resolved) {
+      if(nextTask.state == TaskRollState.Resolved) {
         process.nextTick( _ => {
           ctx.resolve( nextTask.result.value)
         });
@@ -540,19 +540,19 @@ export class AsyncProcess {
       return
     } 
     this.index = this.index + 1;
-    nextTask.state = AsyncProcessState.Running
+    nextTask.state = TaskRollState.Running
 
-    const resolve_task = ( nextTask:AsyncProcess ) => {
-      nextTask.state = AsyncProcessState.Running
+    const resolve_task = ( nextTask:TaskRoll ) => {
+      nextTask.state = TaskRollState.Running
       let anotherTask = nextTask.executeTask( ctx.setParent( this ).setTask( nextTask ).setThread( nextTask) )
       while(anotherTask) {
-        anotherTask.state = AsyncProcessState.Running
+        anotherTask.state = TaskRollState.Running
         nextTask.spawned.push( anotherTask )
         anotherTask = anotherTask.executeTask( ctx.setParent( this ).setTask( nextTask ).setThread( anotherTask) )
       }            
     }
     switch(nextTask.type) {
-      case AsyncProcessType.Sequential:
+      case TaskRollType.Sequential:
         process.nextTick( _ => {
           try {
             resolve_task( nextTask )
@@ -562,7 +562,7 @@ export class AsyncProcess {
           }
         })
         break;
-      case AsyncProcessType.Background:
+      case TaskRollType.Background:
         process.nextTick( _ => {
           try {
             resolve_task( nextTask )
@@ -573,14 +573,14 @@ export class AsyncProcess {
           }
         })        
          break;
-      case AsyncProcessType.Parallel:
+      case TaskRollType.Parallel:
           // start taxk and move forward
           const idx = this.index;
           process.nextTick( _ => {
             try {
               resolve_task( nextTask )
               const peekTask = this.children[idx + 1]
-              if(peekTask && peekTask.type == AsyncProcessType.Parallel) {
+              if(peekTask && peekTask.type == TaskRollType.Parallel) {
                 this.step(ctx)
               }
               if(!peekTask) this.step(ctx)
@@ -593,12 +593,12 @@ export class AsyncProcess {
     }    
   }
 
-  async stopChildren( state : AsyncProcessState ) {
+  async stopChildren( state : TaskRollState ) {
     if(this.committed) return;
     // close any running process
     const stop_task = async (ch) => {
       if(ch.committed) return
-      if(ch.state == AsyncProcessState.Running) {
+      if(ch.state == TaskRollState.Running) {
         await ch.stopChildren(state)
         try {
           if(ch.onCleanup) await ch.onCleanup(ch.result)        
@@ -608,9 +608,9 @@ export class AsyncProcess {
         }
         ch.state = state
       } else {
-        if(ch.state != AsyncProcessState.Begin) {
+        if(ch.state != TaskRollState.Begin) {
           await ch.stopChildren(state)
-          if( ch.state != AsyncProcessState.Rejected && ch.onCancel) await ch.onCancel(ch.result)
+          if( ch.state != TaskRollState.Rejected && ch.onCancel) await ch.onCancel(ch.result)
           ch.state = state
         }   
       }
@@ -625,10 +625,10 @@ export class AsyncProcess {
     }    
   }
 
-  async cleanChildren( state : AsyncProcessState ) {
+  async cleanChildren( state : TaskRollState ) {
     const list = this.children.slice().reverse()
     const clean_task = async (ch) => {
-      if(ch.state == AsyncProcessState.Running) {
+      if(ch.state == TaskRollState.Running) {
         await ch.cleanChildren(state)
         try {
           if(ch.onCleanup) await ch.onCleanup(ch.result)
@@ -649,20 +649,20 @@ export class AsyncProcess {
 
   onFulfilled( fn:readyFnHandler) {
     // if ready, return immediately
-    if(this.state == AsyncProcessState.Resolved || this.state == AsyncProcessState.Rejected) {
+    if(this.state == TaskRollState.Resolved || this.state == TaskRollState.Rejected) {
       fn(this.ctx)
       return
     }    
     this.onFulfilledHandlers.push(fn)
   }
   
-  async endGracefully(ctx:AsyncProcessCtx) {
+  async endGracefully(ctx:TaskRollCtx) {
     
-    // console.log("Process AsyncProcessState.Resolved")
+    // console.log("Process TaskRollState.Resolved")
     if(this.closeAtEnd) {
-      await this.stopChildren( AsyncProcessState.Resolved  )
+      await this.stopChildren( TaskRollState.Resolved  )
     } else {
-      await this.cleanChildren( AsyncProcessState.Resolved  )
+      await this.cleanChildren( TaskRollState.Resolved  )
     }
     if(this.ctx.parent) {
       // console.log("Does have parent")
@@ -673,11 +673,11 @@ export class AsyncProcess {
         this.ctx.parent.resolve( this.ctx.setValue( ctx.value ).reduceState( ctx.state ) )
       }
     }
-    this.state = AsyncProcessState.Resolved
+    this.state = TaskRollState.Resolved
     if(this.onCleanup) this.onCleanup(this.result)
     this.onFulfilledHandlers.forEach( fn => fn(this.ctx))
   }
-  async endWithError(ctx:AsyncProcessCtx) {
+  async endWithError(ctx:TaskRollCtx) {
 
     if(this.shutdown) {
       // wait until state become shutdown
@@ -686,7 +686,7 @@ export class AsyncProcess {
       }
       return;
     }   
-    if( this.state == AsyncProcessState.Rejected ) {
+    if( this.state == TaskRollState.Rejected ) {
       return
     }
 
@@ -696,20 +696,20 @@ export class AsyncProcess {
       return
     }    
     this.shutdown = true
-    await this.stopChildren( AsyncProcessState.Rejected )
+    await this.stopChildren( TaskRollState.Rejected )
     try {
       if( this.onCancel && !this.committed ) this.onCancel(this.result)   
     } catch(e) {
       // if onCancel fails there could be trouble, should be noted somehow
     }
     this.shutdown = false
-    this.state = AsyncProcessState.Rejected
+    this.state = TaskRollState.Rejected
     this.onFulfilledHandlers.forEach( fn => fn(this.ctx))
 
   }
 
   serialize() : Object {
-    const walk_process = (p:AsyncProcess) : Object => {
+    const walk_process = (p:TaskRoll) : Object => {
       return {
         name : p.name,
         initCtx : p.ctx && p.ctx.serialize() || null,
@@ -728,7 +728,9 @@ export class AsyncProcess {
     return walk_process(this)
   }
 
-  start( ctx?:AsyncProcessCtx) {
+  start( ctx?:TaskRollCtx) {
+    // do not bind to node.js process automatically this time
+    /*
     process.on('SIGINT', async () => {
       console.log("SIGINT")
       await this.endWithError(this.ctx)
@@ -744,7 +746,8 @@ export class AsyncProcess {
         await this.endWithError(this.ctx)
         process.exit(1);
       });    
-    this.ctx = ctx || new AsyncProcessCtx();
+    */
+    this.ctx = ctx || new TaskRollCtx();
     this.closeAtEnd = true
     this._start(this.ctx)
   }

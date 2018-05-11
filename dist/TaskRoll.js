@@ -1,33 +1,41 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-var AsyncProcessType;
-(function (AsyncProcessType) {
-    AsyncProcessType[AsyncProcessType["Sequential"] = 1] = "Sequential";
-    AsyncProcessType[AsyncProcessType["Parallel"] = 2] = "Parallel";
-    AsyncProcessType[AsyncProcessType["Race"] = 3] = "Race";
-    AsyncProcessType[AsyncProcessType["Loop"] = 4] = "Loop";
-    AsyncProcessType[AsyncProcessType["Catch"] = 5] = "Catch";
-    AsyncProcessType[AsyncProcessType["Background"] = 6] = "Background";
-})(AsyncProcessType = exports.AsyncProcessType || (exports.AsyncProcessType = {}));
-var AsyncProcessState;
-(function (AsyncProcessState) {
-    AsyncProcessState[AsyncProcessState["Begin"] = 1] = "Begin";
-    AsyncProcessState[AsyncProcessState["Pending"] = 2] = "Pending";
-    AsyncProcessState[AsyncProcessState["Running"] = 3] = "Running";
-    AsyncProcessState[AsyncProcessState["Cancelled"] = 4] = "Cancelled";
-    AsyncProcessState[AsyncProcessState["Resolved"] = 5] = "Resolved";
-    AsyncProcessState[AsyncProcessState["Rejected"] = 6] = "Rejected";
-})(AsyncProcessState = exports.AsyncProcessState || (exports.AsyncProcessState = {}));
+var TaskRollType;
+(function (TaskRollType) {
+    TaskRollType[TaskRollType["Sequential"] = 1] = "Sequential";
+    TaskRollType[TaskRollType["Parallel"] = 2] = "Parallel";
+    TaskRollType[TaskRollType["Race"] = 3] = "Race";
+    TaskRollType[TaskRollType["Loop"] = 4] = "Loop";
+    TaskRollType[TaskRollType["Catch"] = 5] = "Catch";
+    TaskRollType[TaskRollType["Background"] = 6] = "Background";
+})(TaskRollType = exports.TaskRollType || (exports.TaskRollType = {}));
+var TaskRollState;
+(function (TaskRollState) {
+    TaskRollState[TaskRollState["Begin"] = 1] = "Begin";
+    TaskRollState[TaskRollState["Pending"] = 2] = "Pending";
+    TaskRollState[TaskRollState["Running"] = 3] = "Running";
+    TaskRollState[TaskRollState["Cancelled"] = 4] = "Cancelled";
+    TaskRollState[TaskRollState["Resolved"] = 5] = "Resolved";
+    TaskRollState[TaskRollState["Rejected"] = 6] = "Rejected";
+})(TaskRollState = exports.TaskRollState || (exports.TaskRollState = {}));
 function sleep(ms) {
     return new Promise((r) => {
         setTimeout(r, ms);
     });
 }
-class AsyncProcessCtx {
+class TaskRollCtx {
     serialize() {
         const s = {};
         Object.keys(this.state).forEach(key => {
-            if (!(this.state[key] instanceof AsyncProcess)) {
+            if (!(this.state[key] instanceof TaskRoll)) {
                 s[key] = this.state[key];
             }
         });
@@ -44,7 +52,7 @@ class AsyncProcessCtx {
         this.state = {};
     }
     _copy() {
-        const n = new AsyncProcessCtx();
+        const n = new TaskRollCtx();
         n.value = this.value;
         n.parent = this.parent;
         n.task = this.task;
@@ -92,7 +100,7 @@ class AsyncProcessCtx {
         return o;
     }
     resolve(value) {
-        if (value instanceof AsyncProcessCtx) {
+        if (value instanceof TaskRollCtx) {
             this.parent.resolve(value);
             return;
         }
@@ -107,12 +115,12 @@ class AsyncProcessCtx {
         this.parent.reject(this);
     }
 }
-exports.AsyncProcessCtx = AsyncProcessCtx;
-class AsyncProcess {
+exports.TaskRollCtx = TaskRollCtx;
+class TaskRoll {
     constructor(cbs) {
         this.index = -1;
-        this.type = AsyncProcessType.Sequential;
-        this.state = AsyncProcessState.Begin;
+        this.type = TaskRollType.Sequential;
+        this.state = TaskRollState.Begin;
         this.closeAtEnd = false;
         this.shutdown = false;
         this.isolated = false;
@@ -121,8 +129,8 @@ class AsyncProcess {
         this.children = [];
         this.spawned = [];
         this.onFulfilledHandlers = [];
-        this.type = AsyncProcessType.Sequential;
-        this.result = new AsyncProcessCtx();
+        this.type = TaskRollType.Sequential;
+        this.result = new TaskRollCtx();
         if (cbs) {
             this.executeTask = cbs.executeTask || this.executeTask;
             this.onCleanup = cbs.onCleanup || this.onCleanup;
@@ -131,13 +139,13 @@ class AsyncProcess {
         }
     }
     static of(value) {
-        const p = new AsyncProcess({ name: 'of' });
+        const p = new TaskRoll({ name: 'of' });
         if (typeof value === 'undefined')
             return p;
         return p.value(value);
     }
     clone() {
-        const c = new AsyncProcess();
+        const c = new TaskRoll();
         c.type = this.type;
         c.children = this.children.map(c => c.clone());
         c.isolated = this.isolated;
@@ -162,16 +170,16 @@ class AsyncProcess {
         }, 'log');
     }
     sleep(ms) {
-        return this.code(async (_) => {
-            await sleep(ms);
-        }, 'sleep');
+        return this.code((_) => __awaiter(this, void 0, void 0, function* () {
+            yield sleep(ms);
+        }), 'sleep');
     }
     add(o) {
         this.children.push(o);
         return this;
     }
     fork(build) {
-        const o = new AsyncProcess();
+        const o = new TaskRoll();
         o.isolated = true;
         o.name = 'fork';
         build(o);
@@ -179,13 +187,13 @@ class AsyncProcess {
         return this;
     }
     process(build) {
-        const o = new AsyncProcess();
+        const o = new TaskRoll();
         build(o);
         this.children.push(o);
         return this;
     }
     valueFrom(name) {
-        this.children.push(new AsyncProcess({
+        this.children.push(new TaskRoll({
             name: `valueFrom ${name}`,
             executeTask(c) {
                 c.resolve(c.getState(name));
@@ -194,7 +202,7 @@ class AsyncProcess {
         return this;
     }
     valueTo(name) {
-        this.children.push(new AsyncProcess({
+        this.children.push(new TaskRoll({
             name: `valueTo ${name}`,
             executeTask(c) {
                 const newCtx = c.setState(name, c.value);
@@ -205,19 +213,19 @@ class AsyncProcess {
     }
     value(value) {
         if (typeof value === 'function') {
-            const p = new AsyncProcess();
+            const p = new TaskRoll();
             p.code(ctx => value(ctx.value));
             this.children.push(p);
             return this;
         }
-        this.children.push(new AsyncProcess({
+        this.children.push(new TaskRoll({
             name: `value`,
             executeTask(c) {
                 if (typeof (value) == 'function') {
                     c.resolve(value(c.value));
                     return;
                 }
-                if (value instanceof AsyncProcess) {
+                if (value instanceof TaskRoll) {
                     return value.clone();
                 }
                 c.resolve(value);
@@ -226,25 +234,25 @@ class AsyncProcess {
         return this;
     }
     background(build) {
-        const o = new AsyncProcess();
-        o.type = AsyncProcessType.Background;
+        const o = new TaskRoll();
+        o.type = TaskRollType.Background;
         build(o);
         this.children.push(o);
         return this;
     }
     parallel(build) {
-        const o = new AsyncProcess();
-        o.type = AsyncProcessType.Parallel;
+        const o = new TaskRoll();
+        o.type = TaskRollType.Parallel;
         build(o);
         this.children.push(o);
         return this;
     }
     forEach(fn, name) {
-        const o = new AsyncProcess();
+        const o = new TaskRoll();
         o.isolated = true;
         o.name = 'forEach' + (name ? ' ' + name : '');
         o.executeTask = function (ctx) {
-            const mapProcess = new AsyncProcess();
+            const mapProcess = new TaskRoll();
             mapProcess.isolated = true;
             if (typeof fn === 'function') {
                 return mapProcess.value(ctx.value).code(ctx => {
@@ -252,7 +260,7 @@ class AsyncProcess {
                     // return ctx.value.map(fn)
                 });
             }
-            return AsyncProcess.of(ctx.value)
+            return TaskRoll.of(ctx.value)
                 .fork(p => {
                 for (let value of ctx.value) {
                     p.call(fn, value);
@@ -271,18 +279,18 @@ class AsyncProcess {
         return this;
     }
     map(fn) {
-        const o = new AsyncProcess();
+        const o = new TaskRoll();
         o.name = 'map';
         o.executeTask = function (ctx) {
             if (typeof fn === 'function') {
-                return AsyncProcess.of(ctx.value).code(ctx => {
+                return TaskRoll.of(ctx.value).code(ctx => {
                     return Promise.all(ctx.value.map(fn));
                 });
             }
-            if (fn instanceof AsyncProcess) {
+            if (fn instanceof TaskRoll) {
                 o.name = o.name + ' ' + (fn.name || '');
             }
-            return AsyncProcess.of(ctx.value)
+            return TaskRoll.of(ctx.value)
                 .process(p => {
                 const items = [];
                 for (let value of ctx.value) {
@@ -300,12 +308,12 @@ class AsyncProcess {
         return this;
     }
     code(fn, name) {
-        const o = new AsyncProcess();
+        const o = new TaskRoll();
         o.setName(name || 'code');
         o.executeTask = function (ctx) {
             try {
                 const new_value = fn(ctx);
-                if (new_value instanceof AsyncProcess) {
+                if (new_value instanceof TaskRoll) {
                     return new_value;
                 }
                 // resolve promise from code
@@ -338,7 +346,7 @@ class AsyncProcess {
     setName(name) {
         if (typeof (name) == 'string')
             this.name = name;
-        if (name instanceof AsyncProcess)
+        if (name instanceof TaskRoll)
             this.name = name.name;
         return this;
     }
@@ -349,20 +357,20 @@ class AsyncProcess {
             let params = givenParams;
             if (typeof name == 'string')
                 fn = ctx.getState(name);
-            if (name instanceof AsyncProcess)
+            if (name instanceof TaskRoll)
                 fn = name.clone();
-            if (params instanceof AsyncProcess)
+            if (params instanceof TaskRoll)
                 params = givenParams.clone();
             if (typeof name == 'function') {
-                return AsyncProcess.of(params).value(_ => name(_));
+                return TaskRoll.of(params).value(_ => name(_));
             }
             if (typeof params === 'function') {
-                return AsyncProcess.of().code(_ => {
+                return TaskRoll.of().code(_ => {
                     return params(ctx.value);
                 }, name).setName(name).add(fn.clone());
             }
             if (typeof params !== 'undefined') {
-                return AsyncProcess.of(params).setName(name).add(fn.clone());
+                return TaskRoll.of(params).setName(name).add(fn.clone());
             }
             return fn.clone().setName(name);
         }, `${name.name || name}()`);
@@ -370,13 +378,13 @@ class AsyncProcess {
     }
     resolve(ctx) {
         // can not resolve many times
-        if (ctx.task.state == AsyncProcessState.Resolved || ctx.task.state == AsyncProcessState.Rejected) {
+        if (ctx.task.state == TaskRollState.Resolved || ctx.task.state == TaskRollState.Rejected) {
             return;
         }
-        if (this.state != AsyncProcessState.Running) {
+        if (this.state != TaskRollState.Running) {
             return;
         }
-        ctx.task.state = AsyncProcessState.Resolved;
+        ctx.task.state = TaskRollState.Resolved;
         // The result is for both the thread and the task where it was spawned from 
         ctx.thread.result = ctx;
         ctx.task.result = ctx;
@@ -392,14 +400,14 @@ class AsyncProcess {
         const parallels_exited = (key, task) => {
             if (!task)
                 return true;
-            if (task.type != AsyncProcessType.Parallel)
+            if (task.type != TaskRollType.Parallel)
                 return true;
-            if (task.type == AsyncProcessType.Parallel && task.state == AsyncProcessState.Running)
+            if (task.type == TaskRollType.Parallel && task.state == TaskRollState.Running)
                 return false;
             return parallels_exited(key, task[key]);
         };
         if (ctx.task) {
-            if (ctx.task.type == AsyncProcessType.Parallel) {
+            if (ctx.task.type == TaskRollType.Parallel) {
                 if (parallels_exited('prev', ctx.task) && parallels_exited('next', ctx.task)) {
                     this.step(ctx);
                 }
@@ -412,16 +420,16 @@ class AsyncProcess {
         }
     }
     reject(ctx) {
-        if (ctx.task.state !== AsyncProcessState.Running) {
+        if (ctx.task.state !== TaskRollState.Running) {
             return;
         }
         this.endWithError(ctx);
     }
     _start(ctx) {
-        if (this.state !== AsyncProcessState.Begin)
+        if (this.state !== TaskRollState.Begin)
             return;
         this.index = -1;
-        this.state = AsyncProcessState.Running;
+        this.state = TaskRollState.Running;
         this.children.forEach((item, index) => {
             item.next = this.children[index + 1];
             item.prev = index > 0 ? this.children[index - 1] : null;
@@ -429,51 +437,50 @@ class AsyncProcess {
         this.step(this.ctx);
     }
     run(ctx) {
-        this.ctx = ctx || new AsyncProcessCtx();
+        this.ctx = ctx || new TaskRollCtx();
         this._start(this.ctx);
     }
     reset(ctx) {
         this.index = -1;
-        this.state = AsyncProcessState.Begin;
+        this.state = TaskRollState.Begin;
         this.shutdown = false;
         this.spawned = [];
         this.children.forEach(ch => {
-            ch.state = AsyncProcessState.Begin;
+            ch.state = TaskRollState.Begin;
             ch.reset(ctx);
         });
     }
     executeTask(ctx) {
-        if (this.state === AsyncProcessState.Resolved) {
+        if (this.state === TaskRollState.Resolved) {
             // TODO: how to use already resolved value like promises do
             return;
         }
-        if (this.state === AsyncProcessState.Rejected)
+        if (this.state === TaskRollState.Rejected)
             return;
-        this.state = AsyncProcessState.Begin;
+        this.state = TaskRollState.Begin;
         this.run(ctx);
     }
     step(ctx) {
-        if (this.state !== AsyncProcessState.Running) {
-            console.log('can not step');
+        if (this.state !== TaskRollState.Running) {
             return;
         }
         if ((this.index + 1) >= this.children.length) {
-            if (this.type == AsyncProcessType.Background) {
-                this.state = AsyncProcessState.Begin;
+            if (this.type == TaskRollType.Background) {
+                this.state = TaskRollState.Begin;
                 this.reset(this.ctx);
                 this.run(this.ctx);
                 return;
             }
-            // this.state = AsyncProcessState.Resolved
+            // this.state = TaskRollState.Resolved
             process.nextTick(_ => {
                 this.endGracefully(ctx);
             });
             return;
         }
         const nextTask = this.children[this.index + 1];
-        if (!nextTask || nextTask.state !== AsyncProcessState.Begin) {
+        if (!nextTask || nextTask.state !== TaskRollState.Begin) {
             // if the task was resolved return the resolved value
-            if (nextTask.state == AsyncProcessState.Resolved) {
+            if (nextTask.state == TaskRollState.Resolved) {
                 process.nextTick(_ => {
                     ctx.resolve(nextTask.result.value);
                 });
@@ -481,18 +488,18 @@ class AsyncProcess {
             return;
         }
         this.index = this.index + 1;
-        nextTask.state = AsyncProcessState.Running;
+        nextTask.state = TaskRollState.Running;
         const resolve_task = (nextTask) => {
-            nextTask.state = AsyncProcessState.Running;
+            nextTask.state = TaskRollState.Running;
             let anotherTask = nextTask.executeTask(ctx.setParent(this).setTask(nextTask).setThread(nextTask));
             while (anotherTask) {
-                anotherTask.state = AsyncProcessState.Running;
+                anotherTask.state = TaskRollState.Running;
                 nextTask.spawned.push(anotherTask);
                 anotherTask = anotherTask.executeTask(ctx.setParent(this).setTask(nextTask).setThread(anotherTask));
             }
         };
         switch (nextTask.type) {
-            case AsyncProcessType.Sequential:
+            case TaskRollType.Sequential:
                 process.nextTick(_ => {
                     try {
                         resolve_task(nextTask);
@@ -503,7 +510,7 @@ class AsyncProcess {
                     }
                 });
                 break;
-            case AsyncProcessType.Background:
+            case TaskRollType.Background:
                 process.nextTick(_ => {
                     try {
                         resolve_task(nextTask);
@@ -515,14 +522,14 @@ class AsyncProcess {
                     }
                 });
                 break;
-            case AsyncProcessType.Parallel:
+            case TaskRollType.Parallel:
                 // start taxk and move forward
                 const idx = this.index;
                 process.nextTick(_ => {
                     try {
                         resolve_task(nextTask);
                         const peekTask = this.children[idx + 1];
-                        if (peekTask && peekTask.type == AsyncProcessType.Parallel) {
+                        if (peekTask && peekTask.type == TaskRollType.Parallel) {
                             this.step(ctx);
                         }
                         if (!peekTask)
@@ -536,125 +543,133 @@ class AsyncProcess {
                 break;
         }
     }
-    async stopChildren(state) {
-        if (this.committed)
-            return;
-        // close any running process
-        const stop_task = async (ch) => {
-            if (ch.committed)
+    stopChildren(state) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.committed)
                 return;
-            if (ch.state == AsyncProcessState.Running) {
-                await ch.stopChildren(state);
-                try {
-                    if (ch.onCleanup)
-                        await ch.onCleanup(ch.result);
-                    if (ch.onCancel)
-                        await ch.onCancel(ch.result);
-                }
-                catch (e) {
-                }
-                ch.state = state;
-            }
-            else {
-                if (ch.state != AsyncProcessState.Begin) {
-                    await ch.stopChildren(state);
-                    if (ch.state != AsyncProcessState.Rejected && ch.onCancel)
-                        await ch.onCancel(ch.result);
+            // close any running process
+            const stop_task = (ch) => __awaiter(this, void 0, void 0, function* () {
+                if (ch.committed)
+                    return;
+                if (ch.state == TaskRollState.Running) {
+                    yield ch.stopChildren(state);
+                    try {
+                        if (ch.onCleanup)
+                            yield ch.onCleanup(ch.result);
+                        if (ch.onCancel)
+                            yield ch.onCancel(ch.result);
+                    }
+                    catch (e) {
+                    }
                     ch.state = state;
                 }
+                else {
+                    if (ch.state != TaskRollState.Begin) {
+                        yield ch.stopChildren(state);
+                        if (ch.state != TaskRollState.Rejected && ch.onCancel)
+                            yield ch.onCancel(ch.result);
+                        ch.state = state;
+                    }
+                }
+            });
+            const list = this.children.slice().reverse();
+            for (let ch of list) {
+                const spawned = ch.spawned.slice().reverse();
+                for (let spwn of spawned) {
+                    yield stop_task(spwn);
+                }
+                yield stop_task(ch);
             }
-        };
-        const list = this.children.slice().reverse();
-        for (let ch of list) {
-            const spawned = ch.spawned.slice().reverse();
-            for (let spwn of spawned) {
-                await stop_task(spwn);
-            }
-            await stop_task(ch);
-        }
+        });
     }
-    async cleanChildren(state) {
-        const list = this.children.slice().reverse();
-        const clean_task = async (ch) => {
-            if (ch.state == AsyncProcessState.Running) {
-                await ch.cleanChildren(state);
-                try {
-                    if (ch.onCleanup)
-                        await ch.onCleanup(ch.result);
+    cleanChildren(state) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const list = this.children.slice().reverse();
+            const clean_task = (ch) => __awaiter(this, void 0, void 0, function* () {
+                if (ch.state == TaskRollState.Running) {
+                    yield ch.cleanChildren(state);
+                    try {
+                        if (ch.onCleanup)
+                            yield ch.onCleanup(ch.result);
+                    }
+                    catch (e) {
+                        // TODO: what to do if cleanup fails ? 
+                    }
+                    ch.state = state;
                 }
-                catch (e) {
-                    // TODO: what to do if cleanup fails ? 
+            });
+            for (let ch of list) {
+                const spawned = ch.spawned.slice().reverse();
+                for (let spwn of spawned) {
+                    yield clean_task(spwn);
                 }
-                ch.state = state;
+                yield clean_task(ch);
             }
-        };
-        for (let ch of list) {
-            const spawned = ch.spawned.slice().reverse();
-            for (let spwn of spawned) {
-                await clean_task(spwn);
-            }
-            await clean_task(ch);
-        }
+        });
     }
     onFulfilled(fn) {
         // if ready, return immediately
-        if (this.state == AsyncProcessState.Resolved || this.state == AsyncProcessState.Rejected) {
+        if (this.state == TaskRollState.Resolved || this.state == TaskRollState.Rejected) {
             fn(this.ctx);
             return;
         }
         this.onFulfilledHandlers.push(fn);
     }
-    async endGracefully(ctx) {
-        // console.log("Process AsyncProcessState.Resolved")
-        if (this.closeAtEnd) {
-            await this.stopChildren(AsyncProcessState.Resolved);
-        }
-        else {
-            await this.cleanChildren(AsyncProcessState.Resolved);
-        }
-        if (this.ctx.parent) {
-            // console.log("Does have parent")
-            if (this.isolated) {
-                // continue using the same value which was in the ctx previously
-                this.ctx.parent.resolve(this.ctx.reduceState(ctx.state));
+    endGracefully(ctx) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // console.log("Process TaskRollState.Resolved")
+            if (this.closeAtEnd) {
+                yield this.stopChildren(TaskRollState.Resolved);
             }
             else {
-                this.ctx.parent.resolve(this.ctx.setValue(ctx.value).reduceState(ctx.state));
+                yield this.cleanChildren(TaskRollState.Resolved);
             }
-        }
-        this.state = AsyncProcessState.Resolved;
-        if (this.onCleanup)
-            this.onCleanup(this.result);
-        this.onFulfilledHandlers.forEach(fn => fn(this.ctx));
+            if (this.ctx.parent) {
+                // console.log("Does have parent")
+                if (this.isolated) {
+                    // continue using the same value which was in the ctx previously
+                    this.ctx.parent.resolve(this.ctx.reduceState(ctx.state));
+                }
+                else {
+                    this.ctx.parent.resolve(this.ctx.setValue(ctx.value).reduceState(ctx.state));
+                }
+            }
+            this.state = TaskRollState.Resolved;
+            if (this.onCleanup)
+                this.onCleanup(this.result);
+            this.onFulfilledHandlers.forEach(fn => fn(this.ctx));
+        });
     }
-    async endWithError(ctx) {
-        if (this.shutdown) {
-            // wait until state become shutdown
-            while (this.shutdown) {
-                await sleep(100);
+    endWithError(ctx) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.shutdown) {
+                // wait until state become shutdown
+                while (this.shutdown) {
+                    yield sleep(100);
+                }
+                return;
             }
-            return;
-        }
-        if (this.state == AsyncProcessState.Rejected) {
-            return;
-        }
-        // find the uppermost parent to shut down...
-        if (this.ctx.parent) {
-            this.ctx.parent.endWithError(this.ctx.parent.ctx);
-            return;
-        }
-        this.shutdown = true;
-        await this.stopChildren(AsyncProcessState.Rejected);
-        try {
-            if (this.onCancel && !this.committed)
-                this.onCancel(this.result);
-        }
-        catch (e) {
-            // if onCancel fails there could be trouble, should be noted somehow
-        }
-        this.shutdown = false;
-        this.state = AsyncProcessState.Rejected;
-        this.onFulfilledHandlers.forEach(fn => fn(this.ctx));
+            if (this.state == TaskRollState.Rejected) {
+                return;
+            }
+            // find the uppermost parent to shut down...
+            if (this.ctx.parent) {
+                this.ctx.parent.endWithError(this.ctx.parent.ctx);
+                return;
+            }
+            this.shutdown = true;
+            yield this.stopChildren(TaskRollState.Rejected);
+            try {
+                if (this.onCancel && !this.committed)
+                    this.onCancel(this.result);
+            }
+            catch (e) {
+                // if onCancel fails there could be trouble, should be noted somehow
+            }
+            this.shutdown = false;
+            this.state = TaskRollState.Rejected;
+            this.onFulfilledHandlers.forEach(fn => fn(this.ctx));
+        });
     }
     serialize() {
         const walk_process = (p) => {
@@ -676,25 +691,28 @@ class AsyncProcess {
         return walk_process(this);
     }
     start(ctx) {
+        // do not bind to node.js process automatically this time
+        /*
         process.on('SIGINT', async () => {
-            console.log("SIGINT");
-            await this.endWithError(this.ctx);
-            process.exit();
+          console.log("SIGINT")
+          await this.endWithError(this.ctx)
+          process.exit()
         });
         process
-            .on('unhandledRejection', async (reason, p) => {
+          .on('unhandledRejection', async (reason, p) => {
             console.error(reason, 'Unhandled Rejection at Promise', p);
-            await this.endWithError(this.ctx);
-        })
-            .on('uncaughtException', async (err) => {
+            await this.endWithError(this.ctx)
+          })
+          .on('uncaughtException', async err => {
             console.error(err, 'Uncaught Exception thrown');
-            await this.endWithError(this.ctx);
+            await this.endWithError(this.ctx)
             process.exit(1);
-        });
-        this.ctx = ctx || new AsyncProcessCtx();
+          });
+        */
+        this.ctx = ctx || new TaskRollCtx();
         this.closeAtEnd = true;
         this._start(this.ctx);
     }
 }
-exports.AsyncProcess = AsyncProcess;
-//# sourceMappingURL=AsyncProcess.js.map
+exports.TaskRoll = TaskRoll;
+//# sourceMappingURL=TaskRoll.js.map

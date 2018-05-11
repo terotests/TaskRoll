@@ -1,4 +1,4 @@
-import { AsyncProcess, AsyncProcessCtx } from './AsyncProcess'
+import { TaskRoll, TaskRollCtx } from './TaskRoll'
 
 // promisified sleep for testing...
 function sleep (ms:number) : Promise<any> {
@@ -7,7 +7,7 @@ function sleep (ms:number) : Promise<any> {
   })
 }
 
-const findUser = AsyncProcess.of()
+const findUser = TaskRoll.of()
   .code( async ctx => {
     const id = ctx.value
     console.log(`Fetching user ${id} from database :)`)
@@ -21,8 +21,8 @@ const findUser = AsyncProcess.of()
     console.log('could rollback the user op for ', ctx.value)
   })
 
-function user_test() : AsyncProcess {
-  return AsyncProcess.of([1,2,3])
+function user_test() : TaskRoll {
+  return TaskRoll.of([1,2,3])
     .map(findUser) // fetch users from DB using function or process
     .value( _ => {
       // Do whatever you want with the values...
@@ -36,18 +36,18 @@ function user_test() : AsyncProcess {
     .map( async value => value * 10)
     .log( _ => `${_}`)
     .value([2,4,6,8])
-    .map( AsyncProcess.of().value( _ => _ * 20).rollback( async ctx => {
+    .map( TaskRoll.of().value( _ => _ * 20).rollback( async ctx => {
       console.log('rollback of value ', ctx.value)
      }))
     .log( _ => `${_}`)
 }
 
-function simple_test() : AsyncProcess {
-  const mapper = AsyncProcess.of().value( _ => _ * 15)
-  const show_slowly = AsyncProcess.of()
+function simple_test() : TaskRoll {
+  const mapper = TaskRoll.of().value( _ => _ * 15)
+  const show_slowly = TaskRoll.of()
     .log( _ => _ )
     .sleep(200)
-  const process = AsyncProcess.of([1,2,3])
+  const process = TaskRoll.of([1,2,3])
     .map(mapper)
     .forEach(show_slowly)
     .value(100)
@@ -59,45 +59,45 @@ function simple_test() : AsyncProcess {
   return process
 }
 
-function call_comp() : AsyncProcess {
-  const mapper = AsyncProcess.of().value( _ => _ * 5)
-  const value = AsyncProcess.of( AsyncProcess.of(50).value( _ => _ + 1) )
-  return AsyncProcess.of().call( mapper, value )
+function call_comp() : TaskRoll {
+  const mapper = TaskRoll.of().value( _ => _ * 5)
+  const value = TaskRoll.of( TaskRoll.of(50).value( _ => _ + 1) )
+  return TaskRoll.of().call( mapper, value )
     .log( _ => `call_comp : ${_}` )
 }
 
-function call_comp2() : AsyncProcess {
-  const mulBy10 = AsyncProcess.of().value( _ => _ * 10)
-  const mapper = AsyncProcess.of().value( _ => mulBy10)
-  const value = AsyncProcess.of(50)
-  return AsyncProcess.of( value ).call( mapper )
+function call_comp2() : TaskRoll {
+  const mulBy10 = TaskRoll.of().value( _ => _ * 10)
+  const mapper = TaskRoll.of().value( _ => mulBy10)
+  const value = TaskRoll.of(50)
+  return TaskRoll.of( value ).call( mapper )
   .log( _ => `call_comp2 50 x 10 : ${_}` )
 }
 
-function call_comp2_variant() : AsyncProcess {
-  const mulBy5 = AsyncProcess.of().value( _ => _ * 5).log('5 x is slow :)').sleep(1000)
-  const mulBy10 = AsyncProcess.of().value( _ => _ * 10)
-  return AsyncProcess.of(50)
+function call_comp2_variant() : TaskRoll {
+  const mulBy5 = TaskRoll.of().value( _ => _ * 5).log('5 x is slow :)').sleep(1000)
+  const mulBy10 = TaskRoll.of().value( _ => _ * 10)
+  return TaskRoll.of(50)
           .value(mulBy10)
           .value(mulBy5)
           .value(mulBy5)
     .log( _ => `${_} == 50 x 10 x 5 x 5` )  
 }
 
-function test_calling() : AsyncProcess {
-  const mapper = AsyncProcess.of(12345)
+function test_calling() : TaskRoll {
+  const mapper = TaskRoll.of(12345)
 
   // test re-using composed lazy value reading as parameter
-  const value = AsyncProcess.of( 
-    AsyncProcess.of( 
-        AsyncProcess.of( 50 ) 
+  const value = TaskRoll.of( 
+    TaskRoll.of( 
+        TaskRoll.of( 50 ) 
           .sleep(200)
           .log('reading the value ...')
           .sleep(1200)
       ))  
-  // const value = AsyncProcess.of( AsyncProcess.of( 50 ) )
-  // const value2 = AsyncProcess.of( AsyncProcess.of( 60 ) )
-  return AsyncProcess.of( value ).call( mapper )
+  // const value = TaskRoll.of( TaskRoll.of( 50 ) )
+  // const value2 = TaskRoll.of( TaskRoll.of( 60 ) )
+  return TaskRoll.of( value ).call( mapper )
       .log( _ => `call_comp3 : ${_}` )
       .log('test calling with normal function')
       .call( async _ => {
@@ -117,7 +117,7 @@ function test_calling() : AsyncProcess {
       }, value)
 }
 
-AsyncProcess.of()
+TaskRoll.of()
   .add( user_test() )
   .add( simple_test() )
   .add( call_comp() )
