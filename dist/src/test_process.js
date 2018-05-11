@@ -119,5 +119,8 @@ TaskRoll_1.TaskRoll.of()
     .add(call_comp2())
     .add(call_comp2_variant())
     .add(test_calling())
+    .rollback((_) => __awaiter(this, void 0, void 0, function* () {
+    console.log('TaskRoll ends');
+}))
     .start();
 //# sourceMappingURL=test_process.js.map

@@ -97,7 +97,7 @@ export declare class TaskRoll {
     step(ctx: TaskRollCtx): void;
     stopChildren(state: TaskRollState): Promise<void>;
     cleanChildren(state: TaskRollState): Promise<void>;
-    onFulfilled(fn: readyFnHandler): void;
+    onFulfilled(fn: readyFnHandler): TaskRoll;
     endGracefully(ctx: TaskRollCtx): Promise<void>;
     endWithError(ctx: TaskRollCtx): Promise<void>;
     serialize(): Object;

@@ -196,7 +196,9 @@ export class TaskRoll {
   }
 
   commit () : TaskRoll {
-    this.committed = true
+    this.code( _ => {
+      this.committed = true
+    })
     return this
   }
 
@@ -614,7 +616,11 @@ export class TaskRoll {
       } else {
         if(ch.state != TaskRollState.Begin) {
           await ch.stopChildren(state)
-          if( ch.state != TaskRollState.Rejected && ch.onCancel) await ch.onCancel(ch.result)
+          try {
+            if( ch.state != TaskRollState.Rejected && ch.onCancel) await ch.onCancel(ch.result)
+          } catch(e) {
+
+          }
           ch.state = state
         }   
       }
@@ -651,19 +657,18 @@ export class TaskRoll {
     }    
   }
 
-  onFulfilled( fn:readyFnHandler) {
-    // if ready, return immediately
+  onFulfilled( fn:readyFnHandler) : TaskRoll {
     if(this.state == TaskRollState.Resolved || this.state == TaskRollState.Rejected) {
       fn(this.ctx)
       return
     }    
     this.onFulfilledHandlers.push(fn)
+    return this
   }
   
   async endGracefully(ctx:TaskRollCtx) {
     
-    // console.log("Process TaskRollState.Resolved")
-    if(this.closeAtEnd) {
+    if(this.closeAtEnd) {      
       await this.stopChildren( TaskRollState.Resolved  )
     } else {
       await this.cleanChildren( TaskRollState.Resolved  )
@@ -679,6 +684,11 @@ export class TaskRoll {
     }
     this.state = TaskRollState.Resolved
     if(this.onCleanup) this.onCleanup(this.result)
+    try {
+      if(this.closeAtEnd && this.onCancel) this.onCancel(this.result)
+    } catch(e) {
+
+    }
     this.onFulfilledHandlers.forEach( fn => fn(this.ctx))
   }
   async endWithError(ctx:TaskRollCtx) {

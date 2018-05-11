@@ -156,7 +156,9 @@ class TaskRoll {
         return c;
     }
     commit() {
-        this.committed = true;
+        this.code(_ => {
+            this.committed = true;
+        });
         return this;
     }
     log(msg) {
@@ -569,8 +571,12 @@ class TaskRoll {
                 else {
                     if (ch.state != TaskRollState.Begin) {
                         yield ch.stopChildren(state);
-                        if (ch.state != TaskRollState.Rejected && ch.onCancel)
-                            yield ch.onCancel(ch.result);
+                        try {
+                            if (ch.state != TaskRollState.Rejected && ch.onCancel)
+                                yield ch.onCancel(ch.result);
+                        }
+                        catch (e) {
+                        }
                         ch.state = state;
                     }
                 }
@@ -611,16 +617,15 @@ class TaskRoll {
         });
     }
     onFulfilled(fn) {
-        // if ready, return immediately
         if (this.state == TaskRollState.Resolved || this.state == TaskRollState.Rejected) {
             fn(this.ctx);
             return;
         }
         this.onFulfilledHandlers.push(fn);
+        return this;
     }
     endGracefully(ctx) {
         return __awaiter(this, void 0, void 0, function* () {
-            // console.log("Process TaskRollState.Resolved")
             if (this.closeAtEnd) {
                 yield this.stopChildren(TaskRollState.Resolved);
             }
@@ -640,6 +645,12 @@ class TaskRoll {
             this.state = TaskRollState.Resolved;
             if (this.onCleanup)
                 this.onCleanup(this.result);
+            try {
+                if (this.closeAtEnd && this.onCancel)
+                    this.onCancel(this.result);
+            }
+            catch (e) {
+            }
             this.onFulfilledHandlers.forEach(fn => fn(this.ctx));
         });
     }

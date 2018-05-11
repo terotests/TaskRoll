@@ -124,5 +124,8 @@ TaskRoll.of()
   .add( call_comp2() )
   .add( call_comp2_variant() )
   .add( test_calling() )
+  .rollback( async _ => {
+    console.log('TaskRoll ends')
+  })
   .start()
 
