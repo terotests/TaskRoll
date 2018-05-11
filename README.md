@@ -6,7 +6,14 @@ https://www.npmjs.com/package/taskroll
 npm i taskroll
 ```
 
-Creates lazily evaluated tasks, which calcualate asyncronouse tasks in syncronous manner. Tasks can be composed like Promise or Future. Stack safe. Catches exceptions. Holds immutable context, which can be serialized. Supports functions returning promises namely `async` functions and has syncronous rollback to invert side effects in controlled fashion.
+Creates lazily evaluated tasks, which calcualate asyncronouse tasks in syncronous manner. Tasks can be composed like Promisesor Futures. Main features: 
+
+- Stack safe. 
+- Catches exceptions. 
+- Holds immutable context, which can be inspected and serialized. 
+- Supports functions returning promises as args (`async functions`)
+- Rollback is done in reverse order and syncronously allowing arbitary side-effect cancelling
+- Has state which can store temporary data and functions, which can be used as event handlers
 
 ```javascript
   const mapper = TaskRoll.of().value( _ => _ * 15)
