@@ -11,12 +11,11 @@ Creates lazily evaluated tasks, which calcualate asyncronouse tasks in syncronou
 - Lazy evaluation
 - Stack safety
 - Continuation guarding
-- Cancellation support
+- Cancellation support with syncronous reversed rollback
 - Catches exceptions. 
 - Inspectable immutable context after each computation
-- Supports `async` functions
-- Asyncronous Cancellation for controller rollback
-- Execution scope for data and callable Tasks
+- Supports functions returning promises
+- Holds state which can hold data or callable Tasks
 
 ```javascript
   const mapper = TaskRoll.of().value( _ => _ * 15)
