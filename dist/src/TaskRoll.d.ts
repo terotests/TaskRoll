@@ -47,7 +47,7 @@ export declare class TaskRollCtx {
     resolve(value?: any): void;
     reject(): void;
 }
-export declare class TaskRoll {
+export default class TaskRoll {
     index: number;
     type: TaskRollType;
     state: TaskRollState;
