@@ -126,11 +126,23 @@ async function fails(value) {
 async function tester() {
 
   try {
+    
     await TaskRoll.of('message...').log( _ => _ ).value( async foo => {
       return TaskRoll.of().log('Was Called...').sleep(1000)
     }).chain( _ => _ ).commit().rollback( async _ => {
       console.log('task Rollback');
     }).toPromise()
+    
+    try {
+      await TaskRoll.of(5).chain( _ => {
+        throw "Whaat!!!!"
+      }).rollback( async _=> {
+        console.log("... rolling ...")
+      }).toPromise()
+    } catch(e) {
+      console.log('--- error ---')
+      console.log(e)
+    }
 
     await TaskRoll.of(5)
       .fork( p => {

@@ -128,6 +128,17 @@ function tester() {
             })).chain(_ => _).commit().rollback((_) => __awaiter(this, void 0, void 0, function* () {
                 console.log('task Rollback');
             })).toPromise();
+            try {
+                yield TaskRoll_1.default.of(5).chain(_ => {
+                    throw "Whaat!!!!";
+                }).rollback((_) => __awaiter(this, void 0, void 0, function* () {
+                    console.log("... rolling ...");
+                })).toPromise();
+            }
+            catch (e) {
+                console.log('--- error ---');
+                console.log(e);
+            }
             yield TaskRoll_1.default.of(5)
                 .fork(p => {
                 p.log('Testing forked processs');

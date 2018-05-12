@@ -111,9 +111,13 @@ class TaskRollCtx {
             this.parent.resolve(this);
         }
     }
-    reject() {
-        if (this.parent)
+    reject(value) {
+        if (typeof (value) != 'undefined') {
+            this.parent.reject(this.setValue(value));
+        }
+        else {
             this.parent.reject(this);
+        }
     }
 }
 exports.TaskRollCtx = TaskRollCtx;
@@ -325,9 +329,9 @@ class TaskRoll {
                 // resolve promise from code
                 if (new_value && new_value.then) {
                     new_value.then(_ => ctx.resolve(_), err => {
-                        ctx.parent.reject(ctx);
-                    }).catch(_ => {
-                        ctx.parent.reject(ctx);
+                        ctx.reject(err);
+                    }).catch(err => {
+                        ctx.reject(err);
                     });
                     return;
                 }
@@ -339,8 +343,7 @@ class TaskRoll {
                 }
             }
             catch (e) {
-                console.error(e);
-                ctx.parent.reject(ctx);
+                ctx.reject(e);
             }
         };
         this.children.push(o);
@@ -404,7 +407,7 @@ class TaskRoll {
                 ctx.task.onCleanup(ctx);
         }
         catch (e) {
-            this.endWithError(ctx);
+            this.endWithError(ctx.setValue(e));
             return;
         }
         const parallels_exited = (key, task) => {
@@ -432,6 +435,13 @@ class TaskRoll {
     reject(ctx) {
         // console.log('reject was called!')
         if (ctx && ctx.task && ctx.task.state !== TaskRollState.Running) {
+            return;
+        }
+        ctx.thread.result = ctx;
+        ctx.task.result = ctx;
+        this.result = ctx;
+        if (this.ctx && this.ctx.parent) {
+            this.ctx.parent.reject(ctx);
             return;
         }
         this.endWithError(ctx);
@@ -517,7 +527,7 @@ class TaskRoll {
                     }
                     catch (e) {
                         console.error(e);
-                        this.endWithError(ctx);
+                        this.endWithError(ctx.setValue(e));
                     }
                 });
                 break;
@@ -529,7 +539,7 @@ class TaskRoll {
                     }
                     catch (e) {
                         console.error(e);
-                        this.endWithError(ctx);
+                        this.endWithError(ctx.setValue(e));
                     }
                 });
                 break;
@@ -548,7 +558,7 @@ class TaskRoll {
                     }
                     catch (e) {
                         console.error(e);
-                        this.endWithError(ctx);
+                        this.endWithError(ctx.setValue(e));
                     }
                 });
                 break;
@@ -582,6 +592,7 @@ class TaskRoll {
                                 yield ch.onCancel(ch.result);
                         }
                         catch (e) {
+                            console.error(e);
                         }
                         ch.state = state;
                     }
@@ -614,6 +625,7 @@ class TaskRoll {
                     }
                     catch (e) {
                         // TODO: what to do if cleanup fails ? 
+                        console.error(e);
                     }
                     ch.state = state;
                 }
@@ -661,6 +673,7 @@ class TaskRoll {
                     this.onCancel(this.result);
             }
             catch (e) {
+                console.error(e);
             }
             this.onFulfilledHandlers.forEach(fn => fn(this.ctx));
         });
@@ -680,7 +693,7 @@ class TaskRoll {
                 }
                 // find the uppermost parent to shut down...
                 if (this.ctx && this.ctx.parent) {
-                    this.ctx.parent.endWithError(this.ctx.parent.ctx);
+                    this.ctx.parent.endWithError(ctx);
                     return;
                 }
                 this.shutdown = true;
@@ -689,7 +702,7 @@ class TaskRoll {
                     this.onCancel(this.result);
                 this.shutdown = false;
                 this.state = TaskRollState.Rejected;
-                this.onFulfilledHandlers.forEach(fn => fn(this.ctx));
+                this.onFulfilledHandlers.forEach(fn => fn(this.result));
             }
             catch (e) {
                 console.error(e);
@@ -740,14 +753,16 @@ class TaskRoll {
     }
     toPromise() {
         return new Promise((resolve, reject) => {
-            this.onFulfilled(_ => {
+            this.onFulfilled(ctx => {
                 if (this.state == TaskRollState.Resolved) {
-                    resolve(this.result && this.result.value);
+                    resolve(ctx.value);
+                    return;
                 }
                 if (this.state == TaskRollState.Rejected) {
-                    reject(this.result && this.result.value);
+                    reject(ctx.value);
+                    return;
                 }
-                reject();
+                reject(ctx.value);
             });
             this.start();
         });
