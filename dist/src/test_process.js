@@ -122,28 +122,32 @@ function fails(value) {
 }
 function tester() {
     return __awaiter(this, void 0, void 0, function* () {
-        yield TaskRoll_1.default.of('message...').log(_ => _).value((foo) => __awaiter(this, void 0, void 0, function* () {
-            return TaskRoll_1.default.of().log('Was Called...').sleep(1000);
-        })).chain(_ => _).chain(fails).commit().rollback((_) => __awaiter(this, void 0, void 0, function* () {
-            console.log('task Rollback');
-        })).toPromise();
-        yield TaskRoll_1.default.of(5)
-            .rollback((_) => __awaiter(this, void 0, void 0, function* () {
-            console.log('task 5 Rollback');
-        })).commit().toPromise();
-        console.log(yield TaskRoll_1.default.of('Promised value!').log('promisified').sleep(1000).log('done').toPromise());
-        const result = yield TaskRoll_1.default.of()
-            .add(user_test())
-            .add(simple_test())
-            .add(call_comp())
-            .add(call_comp2())
-            .add(call_comp2_variant())
-            .add(test_calling())
-            .rollback((_) => __awaiter(this, void 0, void 0, function* () {
-            console.log('TaskRoll ends');
-        }))
-            .toPromise();
-        console.log('the evaluation result was ', result);
+        try {
+            yield TaskRoll_1.default.of('message...').log(_ => _).value((foo) => __awaiter(this, void 0, void 0, function* () {
+                return TaskRoll_1.default.of().log('Was Called...').sleep(1000);
+            })).chain(_ => _).commit().rollback((_) => __awaiter(this, void 0, void 0, function* () {
+                console.log('task Rollback');
+            })).toPromise();
+            yield TaskRoll_1.default.of(5)
+                .rollback((_) => __awaiter(this, void 0, void 0, function* () {
+                console.log('task 5 Rollback');
+            })).toPromise();
+            console.log(yield TaskRoll_1.default.of('Promised value!').log('promisified').sleep(1000).log('done').toPromise());
+            const result = yield TaskRoll_1.default.of()
+                .add(user_test())
+                .add(simple_test())
+                .add(call_comp())
+                .add(call_comp2())
+                .add(call_comp2_variant())
+                .add(test_calling())
+                .rollback((_) => __awaiter(this, void 0, void 0, function* () {
+                console.log('TaskRoll ends');
+            }))
+                .toPromise();
+            console.log('the evaluation result was ', result);
+        }
+        catch (e) {
+        }
     });
 }
 tester();

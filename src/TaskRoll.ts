@@ -774,7 +774,13 @@ export default class TaskRoll {
   toPromise () : Promise<any> {
     return new Promise( (resolve, reject) => {
       this.onFulfilled( _ => {
-        resolve(this.result && this.result.value)
+        if(this.state == TaskRollState.Resolved) {
+          resolve(this.result && this.result.value)
+        }
+        if(this.state == TaskRollState.Rejected) {
+          reject(this.result && this.result.value)
+        }
+        reject()
       })
       this.start()
     })
