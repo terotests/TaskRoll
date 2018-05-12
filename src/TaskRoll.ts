@@ -227,7 +227,7 @@ export default class TaskRoll {
     const o = new TaskRoll()
     o.isolated = true
     o.name = 'fork'
-    build(o)
+    build(o)   
     this.children.push(o)
     return this;
   }    
@@ -697,7 +697,7 @@ export default class TaskRoll {
     } catch(e) {
 
     }
-    this.onFulfilledHandlers.forEach( fn => fn(this.ctx))
+    this.onFulfilledHandlers.forEach( fn => fn(this.ctx))  
   }
   async endWithError(ctx:TaskRollCtx) {
     try {

@@ -133,6 +133,16 @@ async function tester() {
     }).toPromise()
 
     await TaskRoll.of(5)
+      .fork( p => {
+        p.log('Testing forked processs')
+        p.sleep(2000)
+        p.rollback( async _ => {
+          console.log('The Child process Fork Rollback')
+        })
+      })
+      .sleep(1000)
+      .log('Retuned to the Parent Process...')
+      .sleep(2000)
       .rollback( async _ => {
         console.log('task 5 Rollback');
       }).toPromise()  

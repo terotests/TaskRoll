@@ -129,6 +129,16 @@ function tester() {
                 console.log('task Rollback');
             })).toPromise();
             yield TaskRoll_1.default.of(5)
+                .fork(p => {
+                p.log('Testing forked processs');
+                p.sleep(2000);
+                p.rollback((_) => __awaiter(this, void 0, void 0, function* () {
+                    console.log('The Child process Fork Rollback');
+                }));
+            })
+                .sleep(1000)
+                .log('Retuned to the Parent Process...')
+                .sleep(2000)
                 .rollback((_) => __awaiter(this, void 0, void 0, function* () {
                 console.log('task 5 Rollback');
             })).toPromise();
