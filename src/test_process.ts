@@ -1,4 +1,4 @@
-import TaskRoll from './TaskRoll'
+import TaskRoll, { TaskRollState } from './TaskRoll'
 
 // promisified sleep for testing...
 function sleep (ms:number) : Promise<any> {
@@ -117,15 +117,25 @@ function test_calling() : TaskRoll {
       }, value)
 }
 
-TaskRoll.of()
-  .add( user_test() )
-  .add( simple_test() )
-  .add( call_comp() )
-  .add( call_comp2() )
-  .add( call_comp2_variant() )
-  .add( test_calling() )
-  .rollback( async _ => {
-    console.log('TaskRoll ends')
-  })
-  .start()
+
+
+
+async function tester() {
+  console.log( await TaskRoll.of('Promised value!').log('promisified').sleep(1000).log('done').toPromise() )
+  
+  const result = await TaskRoll.of()
+    .add( user_test() )
+    .add( simple_test() )
+    .add( call_comp() )
+    .add( call_comp2() )
+    .add( call_comp2_variant() )
+    .add( test_calling() )
+    .rollback( async _ => {
+      console.log('TaskRoll ends')
+    })
+    .toPromise()
+  console.log('the evaluation result was ', result)
+}
+tester()
+
 

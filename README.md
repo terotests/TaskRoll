@@ -52,6 +52,14 @@ Starts execution of Task - task will not start without calling start.
 TaskRoll.of().log('Hello World').start()
 ```
 
+## toPromise()
+
+Alternative way to start the evaluation of the task
+
+```javascript
+await TaskRoll.of().log('Hello World').toPromise()
+```
+
 ## .chain( (value:any) => any )
 
 ```javascript

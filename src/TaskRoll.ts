@@ -765,5 +765,20 @@ export default class TaskRoll {
     this.closeAtEnd = true
     this._start(this.ctx)
   }
-  
+
+  toPromise () : Promise<any> {
+    return new Promise( (resolve, reject) => {
+      this.onFulfilled( _ => {
+        if(this.state == TaskRollState.Resolved) {
+          resolve(this.result && this.result.value)
+        }
+        if(this.state == TaskRollState.Rejected) {
+          reject(this.result && this.result.value)
+        }
+        reject()
+      })
+      this.start()
+    })
+  }
+   
 }

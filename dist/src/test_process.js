@@ -115,15 +115,22 @@ function test_calling() {
         console.log("VALUE Again ", _);
     }), value);
 }
-TaskRoll_1.default.of()
-    .add(user_test())
-    .add(simple_test())
-    .add(call_comp())
-    .add(call_comp2())
-    .add(call_comp2_variant())
-    .add(test_calling())
-    .rollback((_) => __awaiter(this, void 0, void 0, function* () {
-    console.log('TaskRoll ends');
-}))
-    .start();
+function tester() {
+    return __awaiter(this, void 0, void 0, function* () {
+        console.log(yield TaskRoll_1.default.of('Promised value!').log('promisified').sleep(1000).log('done').toPromise());
+        const result = yield TaskRoll_1.default.of()
+            .add(user_test())
+            .add(simple_test())
+            .add(call_comp())
+            .add(call_comp2())
+            .add(call_comp2_variant())
+            .add(test_calling())
+            .rollback((_) => __awaiter(this, void 0, void 0, function* () {
+            console.log('TaskRoll ends');
+        }))
+            .toPromise();
+        console.log('the evaluation result was ', result);
+    });
+}
+tester();
 //# sourceMappingURL=test_process.js.map
