@@ -32,7 +32,7 @@ export declare class TaskRollCtx {
     task: TaskRoll;
     thread: TaskRoll;
     params: any;
-    state: Object;
+    state: any;
     serialize(): Object;
     constructor(value?: any, parent?: TaskRoll, params?: any, task?: TaskRoll);
     _copy(): TaskRollCtx;
@@ -102,4 +102,5 @@ export default class TaskRoll {
     endWithError(ctx: TaskRollCtx): Promise<void>;
     serialize(): Object;
     start(ctx?: TaskRollCtx): void;
+    toPromise(): Promise<any>;
 }

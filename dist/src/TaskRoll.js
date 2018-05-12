@@ -112,7 +112,8 @@ class TaskRollCtx {
         }
     }
     reject() {
-        this.parent.reject(this);
+        if (this.parent)
+            this.parent.reject(this);
     }
 }
 exports.TaskRollCtx = TaskRollCtx;
@@ -323,7 +324,11 @@ class TaskRoll {
                 }
                 // resolve promise from code
                 if (new_value && new_value.then) {
-                    new_value.then(_ => ctx.resolve(_));
+                    new_value.then(_ => ctx.resolve(_), err => {
+                        ctx.parent.reject(ctx);
+                    }).catch(_ => {
+                        ctx.parent.reject(ctx);
+                    });
                     return;
                 }
                 if (typeof (new_value) != 'undefined') {
@@ -425,7 +430,8 @@ class TaskRoll {
         }
     }
     reject(ctx) {
-        if (ctx.task.state !== TaskRollState.Running) {
+        // console.log('reject was called!')
+        if (ctx && ctx.task && ctx.task.state !== TaskRollState.Running) {
             return;
         }
         this.endWithError(ctx);
@@ -552,7 +558,6 @@ class TaskRoll {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.committed)
                 return;
-            // close any running process
             const stop_task = (ch) => __awaiter(this, void 0, void 0, function* () {
                 if (ch.committed)
                     return;
@@ -565,6 +570,7 @@ class TaskRoll {
                             yield ch.onCancel(ch.result);
                     }
                     catch (e) {
+                        console.error(e);
                     }
                     ch.state = state;
                 }
@@ -581,13 +587,18 @@ class TaskRoll {
                     }
                 }
             });
-            const list = this.children.slice().reverse();
-            for (let ch of list) {
-                const spawned = ch.spawned.slice().reverse();
-                for (let spwn of spawned) {
-                    yield stop_task(spwn);
+            try {
+                const list = this.children.slice().reverse();
+                for (let ch of list) {
+                    const spawned = ch.spawned.slice().reverse();
+                    for (let spwn of spawned) {
+                        yield stop_task(spwn);
+                    }
+                    yield stop_task(ch);
                 }
-                yield stop_task(ch);
+            }
+            catch (e) {
+                console.error(e);
             }
         });
     }
@@ -626,7 +637,7 @@ class TaskRoll {
     }
     endGracefully(ctx) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.closeAtEnd) {
+            if (this.closeAtEnd && !this.committed) {
                 yield this.stopChildren(TaskRollState.Resolved);
             }
             else {
@@ -646,7 +657,7 @@ class TaskRoll {
             if (this.onCleanup)
                 this.onCleanup(this.result);
             try {
-                if (this.closeAtEnd && this.onCancel)
+                if (this.closeAtEnd && this.onCancel && !this.committed)
                     this.onCancel(this.result);
             }
             catch (e) {
@@ -656,33 +667,33 @@ class TaskRoll {
     }
     endWithError(ctx) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.shutdown) {
-                // wait until state become shutdown
-                while (this.shutdown) {
-                    yield sleep(100);
-                }
-                return;
-            }
-            if (this.state == TaskRollState.Rejected) {
-                return;
-            }
-            // find the uppermost parent to shut down...
-            if (this.ctx.parent) {
-                this.ctx.parent.endWithError(this.ctx.parent.ctx);
-                return;
-            }
-            this.shutdown = true;
-            yield this.stopChildren(TaskRollState.Rejected);
             try {
+                if (this.shutdown) {
+                    // wait until state become shutdown
+                    while (this.shutdown) {
+                        yield sleep(100);
+                    }
+                    return;
+                }
+                if (this.state == TaskRollState.Rejected) {
+                    return;
+                }
+                // find the uppermost parent to shut down...
+                if (this.ctx && this.ctx.parent) {
+                    this.ctx.parent.endWithError(this.ctx.parent.ctx);
+                    return;
+                }
+                this.shutdown = true;
+                yield this.stopChildren(TaskRollState.Rejected);
                 if (this.onCancel && !this.committed)
                     this.onCancel(this.result);
+                this.shutdown = false;
+                this.state = TaskRollState.Rejected;
+                this.onFulfilledHandlers.forEach(fn => fn(this.ctx));
             }
             catch (e) {
-                // if onCancel fails there could be trouble, should be noted somehow
+                console.error(e);
             }
-            this.shutdown = false;
-            this.state = TaskRollState.Rejected;
-            this.onFulfilledHandlers.forEach(fn => fn(this.ctx));
         });
     }
     serialize() {
@@ -730,13 +741,7 @@ class TaskRoll {
     toPromise() {
         return new Promise((resolve, reject) => {
             this.onFulfilled(_ => {
-                if (this.state == TaskRollState.Resolved) {
-                    resolve(this.result && this.result.value);
-                }
-                if (this.state == TaskRollState.Rejected) {
-                    reject(this.result && this.result.value);
-                }
-                reject();
+                resolve(this.result && this.result.value);
             });
             this.start();
         });

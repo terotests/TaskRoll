@@ -118,9 +118,24 @@ function test_calling() : TaskRoll {
 }
 
 
+async function fails(value) {
+  throw "Problem!!! " + value
+}
 
 
 async function tester() {
+
+  await TaskRoll.of('message...').log( _ => _ ).value( async foo => {
+    return TaskRoll.of().log('Was Called...').sleep(1000)
+  }).chain( _ => _ ).chain(fails).commit().rollback( async _ => {
+    console.log('task Rollback');
+  }).toPromise()
+
+  await TaskRoll.of(5)
+    .rollback( async _ => {
+      console.log('task 5 Rollback');
+    }).commit().toPromise()  
+  
   console.log( await TaskRoll.of('Promised value!').log('promisified').sleep(1000).log('done').toPromise() )
   
   const result = await TaskRoll.of()
@@ -135,6 +150,8 @@ async function tester() {
     })
     .toPromise()
   console.log('the evaluation result was ', result)
+  
+  
 }
 tester()
 

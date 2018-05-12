@@ -44,7 +44,7 @@ export class TaskRollCtx {
   task:TaskRoll;
   thread:TaskRoll;
   params:any;
-  state:Object
+  state:any
 
   serialize () : Object {
     const s = {}
@@ -132,7 +132,7 @@ export class TaskRollCtx {
     }
   }
   reject( ) {
-    this.parent.reject( this )
+    if(this.parent) this.parent.reject( this )
   }  
 }
 
@@ -267,7 +267,7 @@ export default class TaskRoll {
   value( value : any | AnyFunction | TaskRoll ) : TaskRoll {
     if(typeof value === 'function') {
       const p = new TaskRoll()
-      p.code( ctx => value(ctx.value) )
+      p.code( ctx => value(ctx.value))
       this.children.push(p)
       return this
     }     
@@ -378,7 +378,11 @@ export default class TaskRoll {
         }
         // resolve promise from code
         if( new_value && new_value.then) {
-          new_value.then( _ => ctx.resolve(_) )
+          new_value.then( _ => ctx.resolve(_), err => {
+            ctx.parent.reject(ctx)
+          }).catch( _ => {
+            ctx.parent.reject(ctx)
+          })
           return;
         }
         if( typeof(new_value) != 'undefined' ) {
@@ -474,7 +478,8 @@ export default class TaskRoll {
   }
 
   reject(ctx:TaskRollCtx) {
-    if(ctx.task.state !== TaskRollState.Running) {
+    // console.log('reject was called!')
+    if(ctx && ctx.task && ctx.task.state !== TaskRollState.Running) {
       return
     }
     this.endWithError(ctx)
@@ -601,7 +606,6 @@ export default class TaskRoll {
 
   async stopChildren( state : TaskRollState ) {
     if(this.committed) return;
-    // close any running process
     const stop_task = async (ch) => {
       if(ch.committed) return
       if(ch.state == TaskRollState.Running) {
@@ -610,7 +614,7 @@ export default class TaskRoll {
           if(ch.onCleanup) await ch.onCleanup(ch.result)        
           if(ch.onCancel) await ch.onCancel(ch.result)
         } catch(e) {
-
+          console.error(e)
         }
         ch.state = state
       } else {
@@ -625,14 +629,18 @@ export default class TaskRoll {
         }   
       }
     }
-    const list = this.children.slice().reverse()
-    for( let ch of list ) {
-      const spawned = ch.spawned.slice().reverse()
-      for( let spwn of spawned ) {
-        await stop_task(spwn)
-      }
-      await stop_task(ch)
-    }    
+    try {
+      const list = this.children.slice().reverse()
+      for( let ch of list ) {
+        const spawned = ch.spawned.slice().reverse()
+        for( let spwn of spawned ) {
+          await stop_task(spwn)
+        }
+        await stop_task(ch)
+      }    
+    } catch(e) {
+      console.error(e)
+    }
   }
 
   async cleanChildren( state : TaskRollState ) {
@@ -668,7 +676,7 @@ export default class TaskRoll {
   
   async endGracefully(ctx:TaskRollCtx) {
     
-    if(this.closeAtEnd) {      
+    if(this.closeAtEnd  && !this.committed) {      
       await this.stopChildren( TaskRollState.Resolved  )
     } else {
       await this.cleanChildren( TaskRollState.Resolved  )
@@ -685,41 +693,38 @@ export default class TaskRoll {
     this.state = TaskRollState.Resolved
     if(this.onCleanup) this.onCleanup(this.result)
     try {
-      if(this.closeAtEnd && this.onCancel) this.onCancel(this.result)
+      if(this.closeAtEnd && this.onCancel && !this.committed) this.onCancel(this.result)
     } catch(e) {
 
     }
     this.onFulfilledHandlers.forEach( fn => fn(this.ctx))
   }
   async endWithError(ctx:TaskRollCtx) {
-
-    if(this.shutdown) {
-      // wait until state become shutdown
-      while(this.shutdown) {
-        await sleep(100)
-      }
-      return;
-    }   
-    if( this.state == TaskRollState.Rejected ) {
-      return
-    }
-
-    // find the uppermost parent to shut down...
-    if(this.ctx.parent) {
-      this.ctx.parent.endWithError( this.ctx.parent.ctx )
-      return
-    }    
-    this.shutdown = true
-    await this.stopChildren( TaskRollState.Rejected )
     try {
+      if(this.shutdown) {
+        // wait until state become shutdown
+        while(this.shutdown) {
+          await sleep(100)
+        }
+        return;
+      }   
+      if( this.state == TaskRollState.Rejected ) {
+        return
+      }
+      // find the uppermost parent to shut down...
+      if(this.ctx && this.ctx.parent) {
+        this.ctx.parent.endWithError( this.ctx.parent.ctx )
+        return
+      }    
+      this.shutdown = true
+      await this.stopChildren( TaskRollState.Rejected )
       if( this.onCancel && !this.committed ) this.onCancel(this.result)   
+      this.shutdown = false
+      this.state = TaskRollState.Rejected
+      this.onFulfilledHandlers.forEach( fn => fn(this.ctx))
     } catch(e) {
-      // if onCancel fails there could be trouble, should be noted somehow
+      console.error(e)
     }
-    this.shutdown = false
-    this.state = TaskRollState.Rejected
-    this.onFulfilledHandlers.forEach( fn => fn(this.ctx))
-
   }
 
   serialize() : Object {
@@ -769,16 +774,10 @@ export default class TaskRoll {
   toPromise () : Promise<any> {
     return new Promise( (resolve, reject) => {
       this.onFulfilled( _ => {
-        if(this.state == TaskRollState.Resolved) {
-          resolve(this.result && this.result.value)
-        }
-        if(this.state == TaskRollState.Rejected) {
-          reject(this.result && this.result.value)
-        }
-        reject()
+        resolve(this.result && this.result.value)
       })
       this.start()
     })
   }
-   
+
 }
