@@ -127,22 +127,27 @@ async function tester() {
 
   try {
 
-    /*
     await TaskRoll.of('message...').log( _ => _ ).value( async foo => {
       return TaskRoll.of().log('Was Called...').sleep(1000)
     }).chain( _ => _ ).commit().rollback( async _ => {
       console.log('task Rollback');
     }).toPromise()
-    */
+    
 
     const longer_than_5 = TaskRoll.of().chain( _ =>  _.length > 5)
     const compare =  TaskRoll.of()
+        .log('comparing....')
+        .sleep(300)
         .cond(longer_than_5, 
             TaskRoll.of().log( _ => `${_}.length > 5`),
             TaskRoll.of().log( _ => `${_}.length <= 5`),
         )
-    await TaskRoll.of(['ABC', 'Chevy Van', 'Trekk']).map( compare ).toPromise()
-    return
+    await TaskRoll.of(['ABC', 'Chevy Van', 'Trekk'])
+      .log('calling the map...')
+      .map( compare )
+      .log('compare done!')
+      .toPromise()
+
     try {
       await TaskRoll.of(5).chain( _ => {
         throw "Whaat!!!!"
@@ -150,7 +155,7 @@ async function tester() {
         console.log("... rolling ...")
       }).toPromise()
     } catch(e) {
-      console.log('--- error ---')
+      console.log('--- error which should be caught ---')
       console.log(e)
     }
 
