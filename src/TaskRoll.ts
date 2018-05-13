@@ -144,6 +144,7 @@ export class TaskRollCtx {
 export default class TaskRoll {
 
   index:number = -1;
+  taskIndex:number = 0;
   type:TaskRollType = TaskRollType.Sequential
   state:TaskRollState = TaskRollState.Begin
   
@@ -164,8 +165,8 @@ export default class TaskRoll {
 
   name:string = ''
 
-  onCancel : cleanupFn
-  onCleanup : cleanupFn
+  onCancel : cleanupFn = null
+  onCleanup : cleanupFn = null
 
   constructor(cbs?:ProcessCallbacks) {
     this.children = []
@@ -487,7 +488,7 @@ export default class TaskRoll {
         return
       }
       // step only if this is the last active task
-      if(this.children.indexOf(ctx.task) == this.index) {
+      if(ctx.task.taskIndex == this.index) {
         this.step(ctx)    
       }
     } 
@@ -515,6 +516,7 @@ export default class TaskRoll {
     this.children.forEach( (item, index) => {
       item.next = this.children[index + 1]
       item.prev = index > 0 ? this.children[index - 1] : null
+      item.taskIndex = index
     })
     this.step(this.ctx)
   }
@@ -557,8 +559,7 @@ export default class TaskRoll {
         this.run( this.ctx )
         return;
       }      
-      // this.state = TaskRollState.Resolved
-      process.nextTick( _ => {
+      setImmediate( _ => {
         this.endGracefully( ctx )
       })
       return
@@ -567,7 +568,7 @@ export default class TaskRoll {
     if(!nextTask || nextTask.state !== TaskRollState.Begin) {
       // if the task was resolved return the resolved value
       if(nextTask.state == TaskRollState.Resolved) {
-        process.nextTick( _ => {
+        setImmediate( _ => {
           ctx.resolve( nextTask.result.value)
         });
       }      
@@ -587,7 +588,7 @@ export default class TaskRoll {
     }
     switch(nextTask.type) {
       case TaskRollType.Sequential:
-        process.nextTick( _ => {
+        setImmediate( _ => {
           try {
             resolve_task( nextTask )
           } catch(e) {
@@ -597,7 +598,7 @@ export default class TaskRoll {
         })
         break;
       case TaskRollType.Background:
-        process.nextTick( _ => {
+        setImmediate( _ => {
           try {
             resolve_task( nextTask )
             this.step(ctx)
@@ -610,7 +611,7 @@ export default class TaskRoll {
       case TaskRollType.Parallel:
           // start taxk and move forward
           const idx = this.index;
-          process.nextTick( _ => {
+          setImmediate( _ => {
             try {
               resolve_task( nextTask )
               const peekTask = this.children[idx + 1]
@@ -721,7 +722,7 @@ export default class TaskRoll {
     } catch(e) {
       console.error(e)
     }
-    this.onFulfilledHandlers.forEach( fn => fn(this.ctx))  
+    this.onFulfilledHandlers.forEach( fn => fn(this.result))  
   }
   async endWithError(ctx:TaskRollCtx) {
     try {

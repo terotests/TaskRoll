@@ -1,5 +1,5 @@
 import TaskRoll, { TaskRollState } from './TaskRoll'
-
+import Future from 'fluture'
 // promisified sleep for testing...
 function sleep (ms:number) : Promise<any> {
   return new Promise( (r) => {
@@ -161,6 +161,34 @@ async function tester() {
       .log('compare done!')
       .sleep(2000)
       .toPromise()
+
+    // test stack overflow
+
+    console.time('TaskRoll')
+    const add1 = x => x + 1;
+    var m = TaskRoll.of(1);  
+    const array1 = []  
+    for(var i = 0; i < 100000; i++){
+      array1.push(i)      
+      // m = m.value(add1);
+    }   
+    m.value(array1).map(add1)
+    m.commit()
+    m.log( _ => `100000 adds == ${_.length}`)
+    await m.toPromise() 
+    // console.log( await m.toPromise() )
+    console.timeEnd('TaskRoll')
+
+    console.time('fluture')
+    var add2 = x => x + 1;
+    var m2 = Future.of(1);
+    
+    for(var i = 0; i < 10000; i++){
+      m2 = m2.map(add2);
+    }    
+    m2.fork(console.error, console.log);    
+    console.timeEnd('fluture')
+  
 
 
     try {
