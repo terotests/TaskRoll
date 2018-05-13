@@ -130,13 +130,21 @@ function tester() {
             })).toPromise();
             const longer_than_5 = TaskRoll_1.default.of().chain(_ => _.length > 5);
             const compare = TaskRoll_1.default.of()
-                .log('comparing....')
-                .sleep(300)
                 .cond(longer_than_5, TaskRoll_1.default.of().log(_ => `${_}.length > 5`), TaskRoll_1.default.of().log(_ => `${_}.length <= 5`));
+            const compare2 = TaskRoll_1.default.of()
+                .cond(_ => _.length > 5, TaskRoll_1.default.of().log(_ => `${_}.length > 5`), TaskRoll_1.default.of().log(_ => `${_}.length <= 5`));
+            const compare3 = TaskRoll_1.default.of()
+                .cond((_) => __awaiter(this, void 0, void 0, function* () { return _.length > 5; }), TaskRoll_1.default.of().log(_ => `${_}.length > 5`).value('long'), TaskRoll_1.default.of().log(_ => `${_}.length <= 5`).value('short'));
             yield TaskRoll_1.default.of(['ABC', 'Chevy Van', 'Trekk'])
                 .log('calling the map...')
+                .log('...')
                 .map(compare)
+                .log('...')
+                .map(compare2)
+                .log('...')
+                .map(compare3).log(_ => _)
                 .log('compare done!')
+                .sleep(2000)
                 .toPromise();
             try {
                 yield TaskRoll_1.default.of(5).chain(_ => {

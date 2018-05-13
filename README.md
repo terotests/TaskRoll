@@ -88,9 +88,9 @@ const multiply = TaskRoll.of().chain( _ => _ * 2)
 TaskRoll.of([1,2,3]).map( multiply )
 ```
 
-## .cond( condition:TaskRoll, thenBranch:TaskRoll, elseBranch?:TaskRoll )
+## .cond( condition:any, fn:any, elseFn?:any )
 
-If `condition` is true evaluate `thenBranch` else `elseBranch`
+If `condition` is true evaluate `fn` else `elseFn`
 ```javascript
 const longer_than_5 = TaskRoll.of().chain( _ =>  _.length > 5)
 const compare =  TaskRoll.of()

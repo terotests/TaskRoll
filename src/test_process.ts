@@ -136,17 +136,32 @@ async function tester() {
 
     const longer_than_5 = TaskRoll.of().chain( _ =>  _.length > 5)
     const compare =  TaskRoll.of()
-        .log('comparing....')
-        .sleep(300)
-        .cond(longer_than_5, 
-            TaskRoll.of().log( _ => `${_}.length > 5`),
-            TaskRoll.of().log( _ => `${_}.length <= 5`),
-        )
+      .cond(longer_than_5, 
+          TaskRoll.of().log( _ => `${_}.length > 5`),
+          TaskRoll.of().log( _ => `${_}.length <= 5`),
+      )
+    const compare2 =  TaskRoll.of()
+      .cond(_ => _.length > 5, 
+          TaskRoll.of().log( _ => `${_}.length > 5`),
+          TaskRoll.of().log( _ => `${_}.length <= 5`),
+      ) 
+    const compare3 =  TaskRoll.of()
+      .cond( async _ => _.length > 5, 
+          TaskRoll.of().log( _ => `${_}.length > 5`).value('long'),
+          TaskRoll.of().log( _ => `${_}.length <= 5`).value('short'),
+      )                
     await TaskRoll.of(['ABC', 'Chevy Van', 'Trekk'])
       .log('calling the map...')
+      .log('...')
       .map( compare )
+      .log('...')
+      .map( compare2 ) 
+      .log('...')
+      .map( compare3 ).log( _ => _)      
       .log('compare done!')
+      .sleep(2000)
       .toPromise()
+
 
     try {
       await TaskRoll.of(5).chain( _ => {
