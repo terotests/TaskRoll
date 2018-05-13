@@ -83,7 +83,7 @@ export default class TaskRoll {
     forEach(fn: AnyFunction | TaskRollFn | TaskRoll, name?: string): TaskRoll;
     cleanup(fn: cleanupFnWithCtx): TaskRoll;
     rollback(fn: cleanupFnWithCtx): TaskRoll;
-    cond(condition: TaskRoll, fn: AnyFunction | TaskRollFn | TaskRoll | any, elseFn?: any): TaskRoll;
+    cond(condition: AnyFunction | TaskRollFn | TaskRoll, fn: AnyFunction | TaskRollFn | TaskRoll | any, elseFn?: any): TaskRoll;
     map(fn: AnyFunction | TaskRollFn | TaskRoll | any): TaskRoll;
     code(fn: (ctx: TaskRollCtx) => any, name?: string): TaskRoll;
     fn(name: string, fnCode: TaskRoll): TaskRoll;

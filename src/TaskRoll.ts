@@ -341,7 +341,7 @@ export default class TaskRoll {
     return this
   }
 
-  cond(condition:TaskRoll, fn : AnyFunction | TaskRollFn | TaskRoll | any, elseFn?:any) : TaskRoll {
+  cond(condition:AnyFunction | TaskRollFn | TaskRoll, fn : AnyFunction | TaskRollFn | TaskRoll | any, elseFn?:any) : TaskRoll {
     this.chain( originalValue => {
       return TaskRoll.of(originalValue).chain( condition ).chain( res => {
         if(!res) {
