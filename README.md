@@ -88,6 +88,19 @@ const multiply = TaskRoll.of().chain( _ => _ * 2)
 TaskRoll.of([1,2,3]).map( multiply )
 ```
 
+## .cond( condition:TaskRoll, thenBranch:TaskRoll, elseBranch?:TaskRoll )
+
+If `condition` is true evaluate `thenBranch` else `elseBranch`
+```javascript
+const longer_than_5 = TaskRoll.of().chain( _ =>  _.length > 5)
+const compare =  TaskRoll.of()
+    .cond(longer_than_5, 
+        TaskRoll.of().log( _ => `${_}.length > 5`),
+        TaskRoll.of().log( _ => `${_}.length <= 5`),
+    )
+await TaskRoll.of(['ABC', 'Chevy Van', 'Trekk']).map( compare ).toPromise()
+```
+
 ## .forEach( (value:any) => any )
 
 ```javascript

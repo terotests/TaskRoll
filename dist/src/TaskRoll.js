@@ -288,6 +288,19 @@ class TaskRoll {
         this.onCancel = fn;
         return this;
     }
+    cond(condition, fn, elseFn) {
+        this.chain(originalValue => {
+            return TaskRoll.of(originalValue).chain(condition).chain(res => {
+                if (!res) {
+                    if (typeof elseFn !== 'undefined')
+                        return TaskRoll.of(originalValue).chain(elseFn);
+                    return originalValue;
+                }
+                return TaskRoll.of(originalValue).chain(fn);
+            });
+        });
+        return this;
+    }
     map(fn) {
         const o = new TaskRoll();
         o.name = 'map';

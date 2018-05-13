@@ -341,6 +341,19 @@ export default class TaskRoll {
     return this
   }
 
+  cond(condition:TaskRoll, fn : AnyFunction | TaskRollFn | TaskRoll | any, elseFn?:any) : TaskRoll {
+    this.chain( originalValue => {
+      return TaskRoll.of(originalValue).chain( condition ).chain( res => {
+        if(!res) {
+          if( typeof elseFn !== 'undefined') return TaskRoll.of( originalValue ).chain(elseFn)
+          return originalValue
+        }
+        return TaskRoll.of( originalValue ).chain(fn)
+      })
+    }) 
+    return this
+  }
+
   map ( fn : AnyFunction | TaskRollFn | TaskRoll | any ) : TaskRoll {
     const o = new TaskRoll();
     o.name = 'map'

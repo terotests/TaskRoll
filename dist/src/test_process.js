@@ -123,11 +123,21 @@ function fails(value) {
 function tester() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            yield TaskRoll_1.default.of('message...').log(_ => _).value((foo) => __awaiter(this, void 0, void 0, function* () {
-                return TaskRoll_1.default.of().log('Was Called...').sleep(1000);
-            })).chain(_ => _).commit().rollback((_) => __awaiter(this, void 0, void 0, function* () {
-                console.log('task Rollback');
-            })).toPromise();
+            /*
+            await TaskRoll.of('message...').log( _ => _ ).value( async foo => {
+              return TaskRoll.of().log('Was Called...').sleep(1000)
+            }).chain( _ => _ ).commit().rollback( async _ => {
+              console.log('task Rollback');
+            }).toPromise()
+            */
+            const longer_than_5 = TaskRoll_1.default.of().chain(_ => _.length > 5);
+            const compare = TaskRoll_1.default.of()
+                .cond(longer_than_5, TaskRoll_1.default.of().log(_ => `${_}.length > 5`).rollback((_) => __awaiter(this, void 0, void 0, function* () {
+                console.log('Rolling back ', _.value);
+            })), TaskRoll_1.default.of().log(_ => `${_}.length <= 5`));
+            let t;
+            yield (t = TaskRoll_1.default.of(['ABC', 'Chevy Van', 'Trekk']).map(compare)).toPromise();
+            return;
             try {
                 yield TaskRoll_1.default.of(5).chain(_ => {
                     throw "Whaat!!!!";
