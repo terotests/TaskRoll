@@ -106,12 +106,9 @@ export class TaskRollCtx {
     return o
   }
   setValue( value:any ) : TaskRollCtx {
-    if( value != this.value) {    
-      const o = this._copy()
-      o.value = value
-      return o
-    }
-    return this
+    const o = this._copy()
+    o.value = value
+    return o
   }
   setParent( parent:TaskRoll ) : TaskRollCtx {
     const o = this._copy()
@@ -146,7 +143,8 @@ export class TaskRollCtx {
 
 export default class TaskRoll {
 
-  activeTask:TaskRoll = null;
+  index:number = -1;
+  taskIndex:number = 0;
   type:TaskRollType = TaskRollType.Sequential
   state:TaskRollState = TaskRollState.Begin
   
@@ -164,7 +162,7 @@ export default class TaskRoll {
   shutdown:boolean = false
   isolated:boolean = false
   committed:boolean = false
-  executing:boolean = false
+
   name:string = ''
 
   onCancel : cleanupFn = null
@@ -226,12 +224,6 @@ export default class TaskRoll {
   }
 
   add( o : TaskRoll ) : TaskRoll {
-    const prev = this.children[this.children.length-1]
-    if( prev ) {
-      prev.next = o;
-    }
-    o.prev = prev
-    o.next = null
     this.children.push(o)
     return this;
   }   
@@ -241,19 +233,19 @@ export default class TaskRoll {
     o.isolated = true
     o.name = 'fork'
     build(o)   
-    this.add(o)
+    this.children.push(o)
     return this;
   }    
   
   process( build: (p:TaskRoll) => void ) : TaskRoll {
     const o = new TaskRoll()
     build(o)
-    this.add(o)
+    this.children.push(o)
     return this;
   }   
 
   valueFrom( name:string ) : TaskRoll {
-    this.add( new TaskRoll({
+    this.children.push( new TaskRoll({
       name : `valueFrom ${name}`,
       executeTask(c) {
         c.resolve( c.getState(name) )
@@ -263,7 +255,7 @@ export default class TaskRoll {
   }   
 
   valueTo( name:string ) : TaskRoll {
-    this.add( new TaskRoll({
+    this.children.push( new TaskRoll({
       name : `valueTo ${name}`,
       executeTask(c) {
         const newCtx = c.setState(name, c.value )
@@ -281,10 +273,10 @@ export default class TaskRoll {
     if(typeof value === 'function') {
       const p = new TaskRoll()
       p.code( ctx => value(ctx.value))
-      this.add(p)
+      this.children.push(p)
       return this
     }     
-    this.add( new TaskRoll({
+    this.children.push( new TaskRoll({
       name : `value`,
       executeTask(c) {
         if(typeof(value) == 'function') {
@@ -304,7 +296,7 @@ export default class TaskRoll {
     const o = new TaskRoll()
     o.type = TaskRollType.Background
     build(o)
-    this.add(o)
+    this.children.push(o)
     return this;
   }   
 
@@ -312,7 +304,7 @@ export default class TaskRoll {
     const o = new TaskRoll()
     o.type = TaskRollType.Parallel
     build(o)
-    this.add(o)
+    this.children.push(o)
     return this;
   }   
   
@@ -336,7 +328,7 @@ export default class TaskRoll {
           }
         })
     }
-    this.add(o)    
+    this.children.push(o)    
     return this
   }
 
@@ -389,7 +381,7 @@ export default class TaskRoll {
           })
         })      
     }
-    this.add(o)    
+    this.children.push(o)    
     return this
   }
 
@@ -420,7 +412,7 @@ export default class TaskRoll {
         ctx.reject(e)
       }
     }
-    this.add(o)
+    this.children.push(o)
     return this;
   }  
   
@@ -465,7 +457,7 @@ export default class TaskRoll {
 
   resolve(ctx:TaskRollCtx) {
     // can not resolve many times
-    if(ctx.task.state == TaskRollState.Resolved || ctx.task.state == TaskRollState.Rejected) {
+    if(ctx.task.state == TaskRollState.Resolved || ctx.task.state == TaskRollState.Rejected) {
       return      
     }
     if(this.state != TaskRollState.Running) {
@@ -496,7 +488,7 @@ export default class TaskRoll {
         return
       }
       // step only if this is the last active task
-      if(ctx.task == this.activeTask) {
+      if(ctx.task.taskIndex == this.index) {
         this.step(ctx)    
       }
     } 
@@ -519,8 +511,13 @@ export default class TaskRoll {
 
   _start(ctx:TaskRollCtx) {    
     if(this.state !== TaskRollState.Begin) return
-    this.activeTask = null
+    this.index = -1;
     this.state = TaskRollState.Running
+    this.children.forEach( (item, index) => {
+      item.next = this.children[index + 1]
+      item.prev = index > 0 ? this.children[index - 1] : null
+      item.taskIndex = index
+    })
     this.step(this.ctx)
   }
 
@@ -530,7 +527,7 @@ export default class TaskRoll {
   }
 
   reset (ctx:TaskRollCtx) {
-    this.activeTask = null
+    this.index = -1
     this.state = TaskRollState.Begin
     this.shutdown = false
     this.spawned = []
@@ -555,8 +552,7 @@ export default class TaskRoll {
     if(this.state !== TaskRollState.Running) {
       return
     }
-    this.activeTask = this.activeTask ? this.activeTask.next : this.children[0]
-    if( ! this.activeTask ) {
+    if( ( this.index + 1 ) >= this.children.length) {
       if( this.type == TaskRollType.Background ) {
         this.state = TaskRollState.Begin
         this.reset( this.ctx )
@@ -568,7 +564,7 @@ export default class TaskRoll {
       })
       return
     }
-    const nextTask = this.activeTask
+    const nextTask = this.children[this.index + 1]
     if(!nextTask || nextTask.state !== TaskRollState.Begin) {
       // if the task was resolved return the resolved value
       if(nextTask.state == TaskRollState.Resolved) {
@@ -578,6 +574,7 @@ export default class TaskRoll {
       }      
       return
     } 
+    this.index = this.index + 1;
     nextTask.state = TaskRollState.Running
 
     const resolve_task = ( nextTask:TaskRoll ) => {
@@ -591,7 +588,6 @@ export default class TaskRoll {
     }
     switch(nextTask.type) {
       case TaskRollType.Sequential:
-        // can you walk sequential tasks very fast if they get resolved immediately
         setImmediate( _ => {
           try {
             resolve_task( nextTask )
@@ -613,13 +609,16 @@ export default class TaskRoll {
         })        
          break;
       case TaskRollType.Parallel:
+          // start taxk and move forward
+          const idx = this.index;
           setImmediate( _ => {
             try {
               resolve_task( nextTask )
-              if(nextTask.next && nextTask.next.type == TaskRollType.Parallel) {
+              const peekTask = this.children[idx + 1]
+              if(peekTask && peekTask.type == TaskRollType.Parallel) {
                 this.step(ctx)
               }
-              if(!nextTask.next) this.step(ctx)
+              if(!peekTask) this.step(ctx)
             } catch(e) {
               console.error(e)
               this.endWithError(ctx.setValue(e))
