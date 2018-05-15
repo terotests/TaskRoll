@@ -169,8 +169,7 @@ async function tester() {
     var m = TaskRoll.of(1);  
     const array1 = []  
     for(var i = 0; i < 100000; i++){
-      array1.push(i)      
-      // m = m.value(add1);
+      m = m.value(add1);
     }   
     m.value(array1).map(add1)
     m.commit()
@@ -189,8 +188,6 @@ async function tester() {
     m2.fork(console.error, console.log);    
     console.timeEnd('fluture')
   
-
-
     try {
       await TaskRoll.of(5).chain( _ => {
         throw "Whaat!!!!"

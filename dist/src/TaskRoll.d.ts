@@ -48,7 +48,7 @@ export declare class TaskRollCtx {
     reject(value?: any): void;
 }
 export default class TaskRoll {
-    index: number;
+    activeTask: TaskRoll;
     type: TaskRollType;
     state: TaskRollState;
     children: Array<TaskRoll>;
@@ -62,6 +62,7 @@ export default class TaskRoll {
     shutdown: boolean;
     isolated: boolean;
     committed: boolean;
+    executing: boolean;
     name: string;
     onCancel: cleanupFn;
     onCleanup: cleanupFn;

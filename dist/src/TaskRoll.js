@@ -1,4 +1,12 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 var TaskRollType;
 (function (TaskRollType) {
@@ -77,9 +85,12 @@ class TaskRollCtx {
         return o;
     }
     setValue(value) {
-        const o = this._copy();
-        o.value = value;
-        return o;
+        if (value != this.value) {
+            const o = this._copy();
+            o.value = value;
+            return o;
+        }
+        return this;
     }
     setParent(parent) {
         const o = this._copy();
@@ -115,14 +126,14 @@ class TaskRollCtx {
 exports.TaskRollCtx = TaskRollCtx;
 class TaskRoll {
     constructor(cbs) {
-        this.index = -1;
-        this._i = 0;
+        this.activeTask = null;
         this.type = TaskRollType.Sequential;
         this.state = TaskRollState.Begin;
         this.closeAtEnd = false;
         this.shutdown = false;
         this.isolated = false;
         this.committed = false;
+        this.executing = false;
         this.name = '';
         this.onCancel = null;
         this.onCleanup = null;
@@ -172,11 +183,17 @@ class TaskRoll {
         }, 'log');
     }
     sleep(ms) {
-        return this.code(async (_) => {
-            await sleep(ms);
-        }, 'sleep');
+        return this.code((_) => __awaiter(this, void 0, void 0, function* () {
+            yield sleep(ms);
+        }), 'sleep');
     }
     add(o) {
+        const prev = this.children[this.children.length - 1];
+        if (prev) {
+            prev.next = o;
+        }
+        o.prev = prev;
+        o.next = null;
         this.children.push(o);
         return this;
     }
@@ -185,17 +202,17 @@ class TaskRoll {
         o.isolated = true;
         o.name = 'fork';
         build(o);
-        this.children.push(o);
+        this.add(o);
         return this;
     }
     process(build) {
         const o = new TaskRoll();
         build(o);
-        this.children.push(o);
+        this.add(o);
         return this;
     }
     valueFrom(name) {
-        this.children.push(new TaskRoll({
+        this.add(new TaskRoll({
             name: `valueFrom ${name}`,
             executeTask(c) {
                 c.resolve(c.getState(name));
@@ -204,7 +221,7 @@ class TaskRoll {
         return this;
     }
     valueTo(name) {
-        this.children.push(new TaskRoll({
+        this.add(new TaskRoll({
             name: `valueTo ${name}`,
             executeTask(c) {
                 const newCtx = c.setState(name, c.value);
@@ -220,10 +237,10 @@ class TaskRoll {
         if (typeof value === 'function') {
             const p = new TaskRoll();
             p.code(ctx => value(ctx.value));
-            this.children.push(p);
+            this.add(p);
             return this;
         }
-        this.children.push(new TaskRoll({
+        this.add(new TaskRoll({
             name: `value`,
             executeTask(c) {
                 if (typeof (value) == 'function') {
@@ -242,14 +259,14 @@ class TaskRoll {
         const o = new TaskRoll();
         o.type = TaskRollType.Background;
         build(o);
-        this.children.push(o);
+        this.add(o);
         return this;
     }
     parallel(build) {
         const o = new TaskRoll();
         o.type = TaskRollType.Parallel;
         build(o);
-        this.children.push(o);
+        this.add(o);
         return this;
     }
     forEach(fn, name) {
@@ -272,7 +289,7 @@ class TaskRoll {
                 }
             });
         };
-        this.children.push(o);
+        this.add(o);
         return this;
     }
     cleanup(fn) {
@@ -322,7 +339,7 @@ class TaskRoll {
                 });
             });
         };
-        this.children.push(o);
+        this.add(o);
         return this;
     }
     code(fn, name) {
@@ -354,7 +371,7 @@ class TaskRoll {
                 ctx.reject(e);
             }
         };
-        this.children.push(o);
+        this.add(o);
         return this;
     }
     fn(name, fnCode) {
@@ -435,7 +452,7 @@ class TaskRoll {
                 return;
             }
             // step only if this is the last active task
-            if (ctx.task._i == this.index) {
+            if (ctx.task == this.activeTask) {
                 this.step(ctx);
             }
         }
@@ -457,13 +474,8 @@ class TaskRoll {
     _start(ctx) {
         if (this.state !== TaskRollState.Begin)
             return;
-        this.index = -1;
+        this.activeTask = null;
         this.state = TaskRollState.Running;
-        this.children.forEach((item, index) => {
-            item.next = this.children[index + 1];
-            item.prev = index > 0 ? this.children[index - 1] : null;
-            item._i = index;
-        });
         this.step(this.ctx);
     }
     run(ctx) {
@@ -471,7 +483,7 @@ class TaskRoll {
         this._start(this.ctx);
     }
     reset(ctx) {
-        this.index = -1;
+        this.activeTask = null;
         this.state = TaskRollState.Begin;
         this.shutdown = false;
         this.spawned = [];
@@ -494,21 +506,20 @@ class TaskRoll {
         if (this.state !== TaskRollState.Running) {
             return;
         }
-        if ((this.index + 1) >= this.children.length) {
+        this.activeTask = this.activeTask ? this.activeTask.next : this.children[0];
+        if (!this.activeTask) {
             if (this.type == TaskRollType.Background) {
                 this.state = TaskRollState.Begin;
                 this.reset(this.ctx);
                 this.run(this.ctx);
                 return;
             }
-            // this.state = TaskRollState.Resolved
-            // TODO: change setImmediate to setImmediate
             setImmediate(_ => {
                 this.endGracefully(ctx);
             });
             return;
         }
-        const nextTask = this.children[this.index + 1];
+        const nextTask = this.activeTask;
         if (!nextTask || nextTask.state !== TaskRollState.Begin) {
             // if the task was resolved return the resolved value
             if (nextTask.state == TaskRollState.Resolved) {
@@ -518,7 +529,6 @@ class TaskRoll {
             }
             return;
         }
-        this.index = this.index + 1;
         nextTask.state = TaskRollState.Running;
         const resolve_task = (nextTask) => {
             nextTask.state = TaskRollState.Running;
@@ -531,6 +541,7 @@ class TaskRoll {
         };
         switch (nextTask.type) {
             case TaskRollType.Sequential:
+                // can you walk sequential tasks very fast if they get resolved immediately
                 setImmediate(_ => {
                     try {
                         resolve_task(nextTask);
@@ -554,16 +565,13 @@ class TaskRoll {
                 });
                 break;
             case TaskRollType.Parallel:
-                // start taxk and move forward
-                const idx = this.index;
                 setImmediate(_ => {
                     try {
                         resolve_task(nextTask);
-                        const peekTask = this.children[idx + 1];
-                        if (peekTask && peekTask.type == TaskRollType.Parallel) {
+                        if (nextTask.next && nextTask.next.type == TaskRollType.Parallel) {
                             this.step(ctx);
                         }
-                        if (!peekTask)
+                        if (!nextTask.next)
                             this.step(ctx);
                     }
                     catch (e) {
@@ -574,76 +582,80 @@ class TaskRoll {
                 break;
         }
     }
-    async stopChildren(state) {
-        if (this.committed)
-            return;
-        const stop_task = async (ch) => {
-            if (ch.committed)
+    stopChildren(state) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.committed)
                 return;
-            if (ch.state == TaskRollState.Running) {
-                await ch.stopChildren(state);
-                try {
-                    if (ch.onCleanup)
-                        await ch.onCleanup(ch.result);
-                    if (ch.onCancel)
-                        await ch.onCancel(ch.result);
-                }
-                catch (e) {
-                    console.error(e);
-                }
-                ch.state = state;
-            }
-            else {
-                if (ch.state != TaskRollState.Begin) {
-                    await ch.stopChildren(state);
+            const stop_task = (ch) => __awaiter(this, void 0, void 0, function* () {
+                if (ch.committed)
+                    return;
+                if (ch.state == TaskRollState.Running) {
+                    yield ch.stopChildren(state);
                     try {
-                        if (ch.state != TaskRollState.Rejected && ch.onCancel)
-                            await ch.onCancel(ch.result);
+                        if (ch.onCleanup)
+                            yield ch.onCleanup(ch.result);
+                        if (ch.onCancel)
+                            yield ch.onCancel(ch.result);
                     }
                     catch (e) {
                         console.error(e);
                     }
                     ch.state = state;
                 }
+                else {
+                    if (ch.state != TaskRollState.Begin) {
+                        yield ch.stopChildren(state);
+                        try {
+                            if (ch.state != TaskRollState.Rejected && ch.onCancel)
+                                yield ch.onCancel(ch.result);
+                        }
+                        catch (e) {
+                            console.error(e);
+                        }
+                        ch.state = state;
+                    }
+                }
+            });
+            try {
+                const list = this.children.slice().reverse();
+                for (let ch of list) {
+                    const spawned = ch.spawned.slice().reverse();
+                    for (let spwn of spawned) {
+                        yield stop_task(spwn);
+                    }
+                    yield stop_task(ch);
+                }
             }
-        };
-        try {
+            catch (e) {
+                console.error(e);
+            }
+        });
+    }
+    cleanChildren(state) {
+        return __awaiter(this, void 0, void 0, function* () {
             const list = this.children.slice().reverse();
+            const clean_task = (ch) => __awaiter(this, void 0, void 0, function* () {
+                if (ch.state == TaskRollState.Running) {
+                    yield ch.cleanChildren(state);
+                    try {
+                        if (ch.onCleanup)
+                            yield ch.onCleanup(ch.result);
+                    }
+                    catch (e) {
+                        // TODO: what to do if cleanup fails ? 
+                        console.error(e);
+                    }
+                    ch.state = state;
+                }
+            });
             for (let ch of list) {
                 const spawned = ch.spawned.slice().reverse();
                 for (let spwn of spawned) {
-                    await stop_task(spwn);
+                    yield clean_task(spwn);
                 }
-                await stop_task(ch);
+                yield clean_task(ch);
             }
-        }
-        catch (e) {
-            console.error(e);
-        }
-    }
-    async cleanChildren(state) {
-        const list = this.children.slice().reverse();
-        const clean_task = async (ch) => {
-            if (ch.state == TaskRollState.Running) {
-                await ch.cleanChildren(state);
-                try {
-                    if (ch.onCleanup)
-                        await ch.onCleanup(ch.result);
-                }
-                catch (e) {
-                    // TODO: what to do if cleanup fails ? 
-                    console.error(e);
-                }
-                ch.state = state;
-            }
-        };
-        for (let ch of list) {
-            const spawned = ch.spawned.slice().reverse();
-            for (let spwn of spawned) {
-                await clean_task(spwn);
-            }
-            await clean_task(ch);
-        }
+        });
     }
     onFulfilled(fn) {
         if (this.state == TaskRollState.Resolved || this.state == TaskRollState.Rejected) {
@@ -653,63 +665,67 @@ class TaskRoll {
         this.onFulfilledHandlers.push(fn);
         return this;
     }
-    async endGracefully(ctx) {
-        if (this.closeAtEnd && !this.committed) {
-            await this.stopChildren(TaskRollState.Resolved);
-        }
-        else {
-            await this.cleanChildren(TaskRollState.Resolved);
-        }
-        if (this.ctx.parent) {
-            // console.log("Does have parent")
-            if (this.isolated) {
-                // continue using the same value which was in the ctx previously
-                this.ctx.parent.resolve(this.ctx.reduceState(ctx.state));
+    endGracefully(ctx) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.closeAtEnd && !this.committed) {
+                yield this.stopChildren(TaskRollState.Resolved);
             }
             else {
-                this.ctx.parent.resolve(this.ctx.setValue(ctx.value).reduceState(ctx.state));
+                yield this.cleanChildren(TaskRollState.Resolved);
             }
-        }
-        this.state = TaskRollState.Resolved;
-        if (this.onCleanup)
-            this.onCleanup(this.result);
-        try {
-            if (this.closeAtEnd && this.onCancel && !this.committed)
-                this.onCancel(this.result);
-        }
-        catch (e) {
-            console.error(e);
-        }
-        this.onFulfilledHandlers.forEach(fn => fn(this.result));
-    }
-    async endWithError(ctx) {
-        try {
-            if (this.shutdown) {
-                // wait until state become shutdown
-                while (this.shutdown) {
-                    await sleep(100);
+            if (this.ctx.parent) {
+                // console.log("Does have parent")
+                if (this.isolated) {
+                    // continue using the same value which was in the ctx previously
+                    this.ctx.parent.resolve(this.ctx.reduceState(ctx.state));
                 }
-                return;
+                else {
+                    this.ctx.parent.resolve(this.ctx.setValue(ctx.value).reduceState(ctx.state));
+                }
             }
-            if (this.state == TaskRollState.Rejected) {
-                return;
+            this.state = TaskRollState.Resolved;
+            if (this.onCleanup)
+                this.onCleanup(this.result);
+            try {
+                if (this.closeAtEnd && this.onCancel && !this.committed)
+                    this.onCancel(this.result);
             }
-            // find the uppermost parent to shut down...
-            if (this.ctx && this.ctx.parent) {
-                this.ctx.parent.endWithError(ctx);
-                return;
+            catch (e) {
+                console.error(e);
             }
-            this.shutdown = true;
-            await this.stopChildren(TaskRollState.Rejected);
-            if (this.onCancel && !this.committed)
-                this.onCancel(this.result);
-            this.shutdown = false;
-            this.state = TaskRollState.Rejected;
             this.onFulfilledHandlers.forEach(fn => fn(this.result));
-        }
-        catch (e) {
-            console.error(e);
-        }
+        });
+    }
+    endWithError(ctx) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                if (this.shutdown) {
+                    // wait until state become shutdown
+                    while (this.shutdown) {
+                        yield sleep(100);
+                    }
+                    return;
+                }
+                if (this.state == TaskRollState.Rejected) {
+                    return;
+                }
+                // find the uppermost parent to shut down...
+                if (this.ctx && this.ctx.parent) {
+                    this.ctx.parent.endWithError(ctx);
+                    return;
+                }
+                this.shutdown = true;
+                yield this.stopChildren(TaskRollState.Rejected);
+                if (this.onCancel && !this.committed)
+                    this.onCancel(this.result);
+                this.shutdown = false;
+                this.state = TaskRollState.Rejected;
+                this.onFulfilledHandlers.forEach(fn => fn(this.result));
+            }
+            catch (e) {
+                console.error(e);
+            }
+        });
     }
     serialize() {
         const walk_process = (p) => {
