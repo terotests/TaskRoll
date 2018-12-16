@@ -4,7 +4,7 @@ export declare enum TaskRollType {
     Race = 3,
     Loop = 4,
     Catch = 5,
-    Background = 6,
+    Background = 6
 }
 export declare type cleanupFnWithCtx = (ctx?: TaskRollCtx) => Promise<void>;
 export declare type cleanupFnWithoutCtx = () => Promise<void>;
@@ -24,7 +24,7 @@ export declare enum TaskRollState {
     Running = 3,
     Cancelled = 4,
     Resolved = 5,
-    Rejected = 6,
+    Rejected = 6
 }
 export declare class TaskRollCtx {
     value: any;
